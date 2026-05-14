@@ -218,9 +218,11 @@ H264SpsParseResult parse_h264_sps(std::span<const std::uint8_t> nal_payload) {
         }
     }
 
-    if (!reader.read_ue().has_value()) {
+    const auto log2_max_frame_num_minus4 = reader.read_ue();
+    if (!log2_max_frame_num_minus4.has_value()) {
         return {Status::parse_error("failed to read log2_max_frame_num_minus4"), std::nullopt};
     }
+    info.log2_max_frame_num_minus4 = *log2_max_frame_num_minus4;
     const auto pic_order_cnt_type = reader.read_ue();
     if (!pic_order_cnt_type.has_value()) {
         return {Status::parse_error("failed to read pic_order_cnt_type"), std::nullopt};

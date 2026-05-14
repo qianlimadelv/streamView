@@ -2,6 +2,8 @@ add_library(sv-bitstream
     src/annex_b.cpp
     src/bit_reader.cpp
     src/h264_nal.cpp
+    src/h264_pps.cpp
+    src/h264_slice.cpp
     src/h264_sps.cpp
     src/rbsp.cpp
 )

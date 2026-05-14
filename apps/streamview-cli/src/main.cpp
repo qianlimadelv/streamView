@@ -1,5 +1,7 @@
 #include "streamview/bitstream/annex_b.hpp"
 #include "streamview/bitstream/h264_nal.hpp"
+#include "streamview/bitstream/h264_pps.hpp"
+#include "streamview/bitstream/h264_slice.hpp"
 #include "streamview/bitstream/h264_sps.hpp"
 #include "streamview/export/json_writer.hpp"
 
@@ -60,6 +62,7 @@ std::optional<std::vector<std::uint8_t>> read_file(const std::string& path) {
 
 void write_analysis_json(std::ostream& out, const std::string& input_path, std::span<const std::uint8_t> data) {
     const auto units = streamview::bitstream::scan_annex_b(data);
+    std::optional<streamview::bitstream::H264SpsInfo> active_sps;
 
     out << "{\n";
     out << "  \"format\": \"annex_b\",\n";
@@ -73,6 +76,7 @@ void write_analysis_json(std::ostream& out, const std::string& input_path, std::
 
     for (std::size_t i = 0; i < units.size(); ++i) {
         const auto& unit = units[i];
+        const auto payload = data.subspan(unit.payload_offset, unit.payload_size);
         const auto header = streamview::bitstream::parse_h264_nal_header(data[unit.payload_offset]);
         out << "    {\n";
         out << "      \"index\": " << i << ",\n";
@@ -87,9 +91,9 @@ void write_analysis_json(std::ostream& out, const std::string& input_path, std::
         out << "        \"nal_unit_type_name\": ";
         streamview::exporter::write_json_string(out, streamview::bitstream::h264_nal_type_name(header.nal_unit_type));
         if (header.nal_unit_type == streamview::bitstream::H264NalType::Sps) {
-            const auto payload = data.subspan(unit.payload_offset, unit.payload_size);
             const auto sps = streamview::bitstream::parse_h264_sps(payload);
             if (sps.status.is_ok() && sps.info.has_value()) {
+                active_sps = *sps.info;
                 out << ",\n";
                 out << "        \"sps\": {\n";
                 out << "          \"profile_idc\": " << static_cast<int>(sps.info->profile_idc) << ",\n";
@@ -99,6 +103,7 @@ void write_analysis_json(std::ostream& out, const std::string& input_path, std::
                 out << "          \"chroma_format_idc\": " << sps.info->chroma_format_idc << ",\n";
                 out << "          \"bit_depth_luma\": " << static_cast<int>(sps.info->bit_depth_luma) << ",\n";
                 out << "          \"bit_depth_chroma\": " << static_cast<int>(sps.info->bit_depth_chroma) << ",\n";
+                out << "          \"log2_max_frame_num_minus4\": " << sps.info->log2_max_frame_num_minus4 << ",\n";
                 out << "          \"width\": " << sps.info->width << ",\n";
                 out << "          \"height\": " << sps.info->height << ",\n";
                 out << "          \"frame_mbs_only_flag\": " << (sps.info->frame_mbs_only_flag ? "true" : "false") << ",\n";
@@ -109,6 +114,51 @@ void write_analysis_json(std::ostream& out, const std::string& input_path, std::
                 out << "        \"sps_parse_error\": ";
                 streamview::exporter::write_json_string(out, sps.status.message());
                 out << "\n";
+            }
+        } else if (header.nal_unit_type == streamview::bitstream::H264NalType::Pps) {
+            const auto pps = streamview::bitstream::parse_h264_pps(payload);
+            if (pps.status.is_ok() && pps.info.has_value()) {
+                out << ",\n";
+                out << "        \"pps\": {\n";
+                out << "          \"pic_parameter_set_id\": " << pps.info->pic_parameter_set_id << ",\n";
+                out << "          \"seq_parameter_set_id\": " << pps.info->seq_parameter_set_id << ",\n";
+                out << "          \"entropy_coding_mode_flag\": " << (pps.info->entropy_coding_mode_flag ? "true" : "false") << ",\n";
+                out << "          \"bottom_field_pic_order_in_frame_present_flag\": "
+                    << (pps.info->bottom_field_pic_order_in_frame_present_flag ? "true" : "false") << ",\n";
+                out << "          \"num_slice_groups_minus1\": " << pps.info->num_slice_groups_minus1 << "\n";
+                out << "        }\n";
+            } else {
+                out << ",\n";
+                out << "        \"pps_parse_error\": ";
+                streamview::exporter::write_json_string(out, pps.status.message());
+                out << "\n";
+            }
+        } else if (header.nal_unit_type == streamview::bitstream::H264NalType::CodedSliceNonIdr ||
+                   header.nal_unit_type == streamview::bitstream::H264NalType::CodedSliceIdr) {
+            if (active_sps.has_value()) {
+                const auto slice = streamview::bitstream::parse_h264_slice_header(payload, active_sps->log2_max_frame_num_minus4);
+                if (slice.status.is_ok() && slice.info.has_value()) {
+                    out << ",\n";
+                    out << "        \"slice\": {\n";
+                    out << "          \"first_mb_in_slice\": " << slice.info->first_mb_in_slice << ",\n";
+                    out << "          \"slice_type_raw\": " << slice.info->slice_type_raw << ",\n";
+                    out << "          \"slice_type\": ";
+                    streamview::exporter::write_json_string(out, streamview::bitstream::h264_slice_kind_name(slice.info->slice_kind));
+                    out << ",\n";
+                    out << "          \"slice_type_all_slices\": "
+                        << (slice.info->slice_type_all_slices ? "true" : "false") << ",\n";
+                    out << "          \"pic_parameter_set_id\": " << slice.info->pic_parameter_set_id << ",\n";
+                    out << "          \"frame_num\": " << slice.info->frame_num << "\n";
+                    out << "        }\n";
+                } else {
+                    out << ",\n";
+                    out << "        \"slice_parse_error\": ";
+                    streamview::exporter::write_json_string(out, slice.status.message());
+                    out << "\n";
+                }
+            } else {
+                out << ",\n";
+                out << "        \"slice_parse_error\": \"missing active SPS\"\n";
             }
         } else {
             out << "\n";

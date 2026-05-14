@@ -1,6 +1,8 @@
 #include "streamview/bitstream/annex_b.hpp"
 #include "streamview/bitstream/bit_reader.hpp"
 #include "streamview/bitstream/h264_nal.hpp"
+#include "streamview/bitstream/h264_pps.hpp"
+#include "streamview/bitstream/h264_slice.hpp"
 #include "streamview/bitstream/h264_sps.hpp"
 #include "streamview/bitstream/rbsp.hpp"
 
@@ -129,8 +131,39 @@ void test_parses_h264_sps_dimensions() {
     require(result.info->chroma_format_idc == 1, "SPS chroma_format_idc");
     require(result.info->bit_depth_luma == 8, "SPS bit_depth_luma");
     require(result.info->bit_depth_chroma == 8, "SPS bit_depth_chroma");
+    require(result.info->log2_max_frame_num_minus4 == 0, "SPS log2_max_frame_num_minus4");
     require(result.info->width == 640, "SPS width");
     require(result.info->height == 360, "SPS height");
+}
+
+void test_parses_h264_pps_baseline_fields() {
+    const std::vector<std::uint8_t> pps{0x68, 0xeb, 0xec, 0xb2};
+
+    const auto result = streamview::bitstream::parse_h264_pps(pps);
+
+    require(result.status.is_ok(), "PPS parse status");
+    require(result.info.has_value(), "PPS info present");
+    require(result.info->pic_parameter_set_id == 0, "PPS pic_parameter_set_id");
+    require(result.info->seq_parameter_set_id == 0, "PPS seq_parameter_set_id");
+    require(result.info->entropy_coding_mode_flag, "PPS entropy_coding_mode_flag");
+    require(!result.info->bottom_field_pic_order_in_frame_present_flag, "PPS bottom field flag");
+    require(result.info->num_slice_groups_minus1 == 0, "PPS num_slice_groups_minus1");
+}
+
+void test_parses_h264_slice_header_prefix() {
+    const std::vector<std::uint8_t> slice{0x65, 0x88, 0x80};
+
+    const auto result = streamview::bitstream::parse_h264_slice_header(slice, 0);
+
+    require(result.status.is_ok(), "slice parse status");
+    require(result.info.has_value(), "slice info present");
+    require(result.info->first_mb_in_slice == 0, "slice first_mb_in_slice");
+    require(result.info->slice_type_raw == 7, "slice_type_raw");
+    require(result.info->slice_kind == streamview::bitstream::H264SliceKind::I, "slice kind");
+    require(result.info->slice_type_all_slices, "slice_type_all_slices");
+    require(result.info->pic_parameter_set_id == 0, "slice pps id");
+    require(result.info->frame_num == 0, "slice frame_num");
+    require(streamview::bitstream::h264_slice_kind_name(result.info->slice_kind) == "I", "slice kind name");
 }
 
 } // namespace
@@ -144,5 +177,7 @@ int main() {
     test_bit_reader_reads_across_byte_boundaries();
     test_bit_reader_decodes_exp_golomb();
     test_parses_h264_sps_dimensions();
+    test_parses_h264_pps_baseline_fields();
+    test_parses_h264_slice_header_prefix();
     return 0;
 }

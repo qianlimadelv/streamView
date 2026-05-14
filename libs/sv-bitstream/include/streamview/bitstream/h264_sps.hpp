@@ -16,6 +16,7 @@ struct H264SpsInfo {
     std::uint32_t chroma_format_idc{1};
     std::uint8_t bit_depth_luma{8};
     std::uint8_t bit_depth_chroma{8};
+    std::uint32_t log2_max_frame_num_minus4{};
     std::uint32_t pic_width_in_mbs_minus1{};
     std::uint32_t pic_height_in_map_units_minus1{};
     bool frame_mbs_only_flag{};
