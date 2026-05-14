@@ -1,5 +1,6 @@
 #include "streamview/bitstream/annex_b.hpp"
 #include "streamview/bitstream/h264_nal.hpp"
+#include "streamview/bitstream/h264_sps.hpp"
 #include "streamview/export/json_writer.hpp"
 
 #include <cstdint>
@@ -85,7 +86,33 @@ void write_analysis_json(std::ostream& out, const std::string& input_path, std::
         out << "        \"nal_unit_type\": " << static_cast<int>(header.nal_unit_type) << ",\n";
         out << "        \"nal_unit_type_name\": ";
         streamview::exporter::write_json_string(out, streamview::bitstream::h264_nal_type_name(header.nal_unit_type));
-        out << "\n";
+        if (header.nal_unit_type == streamview::bitstream::H264NalType::Sps) {
+            const auto payload = data.subspan(unit.payload_offset, unit.payload_size);
+            const auto sps = streamview::bitstream::parse_h264_sps(payload);
+            if (sps.status.is_ok() && sps.info.has_value()) {
+                out << ",\n";
+                out << "        \"sps\": {\n";
+                out << "          \"profile_idc\": " << static_cast<int>(sps.info->profile_idc) << ",\n";
+                out << "          \"constraint_flags\": " << static_cast<int>(sps.info->constraint_flags) << ",\n";
+                out << "          \"level_idc\": " << static_cast<int>(sps.info->level_idc) << ",\n";
+                out << "          \"seq_parameter_set_id\": " << sps.info->seq_parameter_set_id << ",\n";
+                out << "          \"chroma_format_idc\": " << sps.info->chroma_format_idc << ",\n";
+                out << "          \"bit_depth_luma\": " << static_cast<int>(sps.info->bit_depth_luma) << ",\n";
+                out << "          \"bit_depth_chroma\": " << static_cast<int>(sps.info->bit_depth_chroma) << ",\n";
+                out << "          \"width\": " << sps.info->width << ",\n";
+                out << "          \"height\": " << sps.info->height << ",\n";
+                out << "          \"frame_mbs_only_flag\": " << (sps.info->frame_mbs_only_flag ? "true" : "false") << ",\n";
+                out << "          \"frame_cropping_flag\": " << (sps.info->frame_cropping_flag ? "true" : "false") << "\n";
+                out << "        }\n";
+            } else {
+                out << ",\n";
+                out << "        \"sps_parse_error\": ";
+                streamview::exporter::write_json_string(out, sps.status.message());
+                out << "\n";
+            }
+        } else {
+            out << "\n";
+        }
         out << "      }\n";
         out << "    }" << (i + 1 == units.size() ? "\n" : ",\n");
     }

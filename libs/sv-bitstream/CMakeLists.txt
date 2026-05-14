@@ -1,6 +1,9 @@
 add_library(sv-bitstream
     src/annex_b.cpp
+    src/bit_reader.cpp
     src/h264_nal.cpp
+    src/h264_sps.cpp
+    src/rbsp.cpp
 )
 
 add_library(StreamView::Bitstream ALIAS sv-bitstream)

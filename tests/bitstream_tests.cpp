@@ -1,5 +1,8 @@
 #include "streamview/bitstream/annex_b.hpp"
+#include "streamview/bitstream/bit_reader.hpp"
 #include "streamview/bitstream/h264_nal.hpp"
+#include "streamview/bitstream/h264_sps.hpp"
+#include "streamview/bitstream/rbsp.hpp"
 
 #include <cstdint>
 #include <cstdlib>
@@ -65,6 +68,71 @@ void test_parses_h264_nal_header() {
     require(streamview::bitstream::h264_nal_type_name(header.nal_unit_type) == "coded_slice_idr", "nal type name");
 }
 
+void test_removes_emulation_prevention_bytes() {
+    const std::vector<std::uint8_t> payload{
+        0x67, 0x00, 0x00, 0x03, 0x01, 0xAA,
+        0x00, 0x00, 0x03, 0x02, 0xBB,
+    };
+
+    const auto rbsp = streamview::bitstream::nal_payload_to_rbsp(payload);
+
+    const std::vector<std::uint8_t> expected{
+        0x67, 0x00, 0x00, 0x01, 0xAA,
+        0x00, 0x00, 0x02, 0xBB,
+    };
+    require(rbsp == expected, "rbsp extraction should remove emulation prevention bytes");
+}
+
+void test_bit_reader_reads_across_byte_boundaries() {
+    const std::vector<std::uint8_t> data{0b1010'1100, 0b0111'0000};
+    streamview::bitstream::BitReader reader(data);
+
+    const auto first = reader.read_bits(4);
+    const auto second = reader.read_bits(6);
+    const auto third = reader.read_bits(2);
+
+    require(first.has_value() && *first == 0b1010, "first nibble");
+    require(second.has_value() && *second == 0b110001, "cross-byte read");
+    require(third.has_value() && *third == 0b11, "third read");
+    require(reader.bit_offset() == 12, "bit offset after reads");
+}
+
+void test_bit_reader_decodes_exp_golomb() {
+    const std::vector<std::uint8_t> data{0b1010'0011, 0b0011'0000};
+    streamview::bitstream::BitReader reader(data);
+
+    const auto zero = reader.read_ue();      // 1
+    const auto one = reader.read_ue();       // 010
+    const auto five = reader.read_ue();      // 00110
+    const auto signed_minus_one = reader.read_se(); // 011 -> code_num 2 -> -1
+
+    require(zero.has_value() && *zero == 0, "ue zero");
+    require(one.has_value() && *one == 1, "ue one");
+    require(five.has_value() && *five == 5, "ue five");
+    require(signed_minus_one.has_value() && *signed_minus_one == -1, "se minus one");
+}
+
+void test_parses_h264_sps_dimensions() {
+    const std::vector<std::uint8_t> sps{
+        0x67, 0x64, 0x00, 0x1f, 0xac, 0xd9, 0x40, 0xa0,
+        0x2f, 0xf9, 0x70, 0x11, 0x00, 0x00, 0x03, 0x00,
+        0x01, 0x00, 0x00, 0x03, 0x00, 0x32, 0x0f, 0x18,
+        0x31, 0x96,
+    };
+
+    const auto result = streamview::bitstream::parse_h264_sps(sps);
+
+    require(result.status.is_ok(), "SPS parse status");
+    require(result.info.has_value(), "SPS info present");
+    require(result.info->profile_idc == 100, "SPS profile_idc");
+    require(result.info->level_idc == 31, "SPS level_idc");
+    require(result.info->chroma_format_idc == 1, "SPS chroma_format_idc");
+    require(result.info->bit_depth_luma == 8, "SPS bit_depth_luma");
+    require(result.info->bit_depth_chroma == 8, "SPS bit_depth_chroma");
+    require(result.info->width == 640, "SPS width");
+    require(result.info->height == 360, "SPS height");
+}
+
 } // namespace
 
 int main() {
@@ -72,5 +140,9 @@ int main() {
     test_ignores_leading_bytes_and_empty_units();
     test_returns_empty_without_start_code();
     test_parses_h264_nal_header();
+    test_removes_emulation_prevention_bytes();
+    test_bit_reader_reads_across_byte_boundaries();
+    test_bit_reader_decodes_exp_golomb();
+    test_parses_h264_sps_dimensions();
     return 0;
 }
