@@ -32,6 +32,16 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+Optional FFmpeg demux support requires FFmpeg development packages
+(`libavformat`, `libavcodec`, `libavutil`) discoverable through `pkg-config`.
+If they are missing, the raw H.264 Annex B analyzer still builds.
+
+Ubuntu/Debian:
+
+```bash
+sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
+```
+
 ## CLI
 
 ```bash

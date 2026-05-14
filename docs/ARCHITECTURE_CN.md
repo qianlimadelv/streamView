@@ -57,3 +57,21 @@ CLI JSON 是当前 MVP 的稳定输出契约。`tests/golden/` 保存期望输�
 - `sv-demux`：通过 FFmpeg `libavformat` 支持 MP4/TS/MKV 输入。
 - `sv-decode`：通过 FFmpeg `libavcodec` 支持 decoded frame preview。
 - `streamview-gui`：Qt 6 桌面 UI，用于 timeline、frame details 和 preview。
+
+## FFmpeg 可选依赖
+
+`sv-demux` 依赖 FFmpeg 开发库：
+
+- `libavformat`
+- `libavcodec`
+- `libavutil`
+
+如果 CMake 找不到对应 pkg-config 包，`sv-demux` 会自动禁用，raw H.264 Annex B MVP 仍然可以正常构建和测试。
+
+Ubuntu/Debian 上启用该模块通常需要：
+
+```bash
+sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
+```
+
+启用后，CLI 可以走 FFmpeg demux 路径，把 `.mp4` 中的 H.264 packet 转成 Annex B，再复用现有 `StreamAnalysis`。

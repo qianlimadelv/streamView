@@ -1,11 +1,15 @@
 #include "streamview/analysis/stream_analysis.hpp"
 #include "streamview/export/analysis_json_writer.hpp"
+#if defined(STREAMVIEW_HAS_FFMPEG_DEMUX)
+#include "streamview/demux/ffmpeg_h264_demuxer.hpp"
+#endif
 
 #include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <optional>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -55,6 +59,32 @@ std::optional<std::vector<std::uint8_t>> read_file(const std::string& path) {
         std::istreambuf_iterator<char>());
 }
 
+bool has_extension(const std::string& path, std::string_view extension) {
+    return std::filesystem::path(path).extension() == extension;
+}
+
+std::optional<std::vector<std::uint8_t>> load_input_as_annex_b(const std::string& path) {
+    if (has_extension(path, ".h264") || has_extension(path, ".264")) {
+        return read_file(path);
+    }
+
+    if (has_extension(path, ".mp4")) {
+#if defined(STREAMVIEW_HAS_FFMPEG_DEMUX)
+        const auto demux = streamview::demux::demux_h264_to_annex_b(path);
+        if (!demux.status.is_ok()) {
+            std::cerr << "streamview: failed to demux MP4: " << demux.status.message() << "\n";
+            return std::nullopt;
+        }
+        return demux.annex_b;
+#else
+        std::cerr << "streamview: MP4 input requires FFmpeg development libraries at build time\n";
+        return std::nullopt;
+#endif
+    }
+
+    return read_file(path);
+}
+
 int write_json_output(const AnalyzeOptions& options, const streamview::analysis::StreamAnalysis& analysis) {
     if (options.json_output_path.has_value()) {
         std::ofstream output(*options.json_output_path, std::ios::binary);
@@ -71,7 +101,7 @@ int write_json_output(const AnalyzeOptions& options, const streamview::analysis:
 }
 
 int run_analyze(const AnalyzeOptions& options) {
-    const auto data = read_file(options.input_path);
+    const auto data = load_input_as_annex_b(options.input_path);
     if (!data.has_value()) {
         std::cerr << "streamview: failed to read input file: " << options.input_path << "\n";
         return 2;
