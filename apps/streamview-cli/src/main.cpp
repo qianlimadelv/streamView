@@ -22,6 +22,22 @@ struct AnalyzeOptions {
     std::optional<std::string> json_output_path;
 };
 
+struct SliceStats {
+    std::size_t total{};
+    std::size_t i{};
+    std::size_t p{};
+    std::size_t b{};
+    std::size_t sp{};
+    std::size_t si{};
+};
+
+struct StreamSummary {
+    std::optional<streamview::bitstream::H264SpsInfo> active_sps;
+    std::size_t sps_count{};
+    std::size_t pps_count{};
+    SliceStats slices;
+};
+
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
         << "  streamview analyze <input.h264> [--json <output.json>]\n"
@@ -60,8 +76,91 @@ std::optional<std::vector<std::uint8_t>> read_file(const std::string& path) {
         std::istreambuf_iterator<char>());
 }
 
+void add_slice_to_summary(StreamSummary& summary, streamview::bitstream::H264SliceKind kind) {
+    ++summary.slices.total;
+    switch (kind) {
+    case streamview::bitstream::H264SliceKind::I:
+        ++summary.slices.i;
+        break;
+    case streamview::bitstream::H264SliceKind::P:
+        ++summary.slices.p;
+        break;
+    case streamview::bitstream::H264SliceKind::B:
+        ++summary.slices.b;
+        break;
+    case streamview::bitstream::H264SliceKind::SP:
+        ++summary.slices.sp;
+        break;
+    case streamview::bitstream::H264SliceKind::SI:
+        ++summary.slices.si;
+        break;
+    }
+}
+
+StreamSummary build_stream_summary(
+    std::span<const std::uint8_t> data,
+    const std::vector<streamview::bitstream::NalUnit>& units) {
+    StreamSummary summary{};
+
+    for (const auto& unit : units) {
+        const auto payload = data.subspan(unit.payload_offset, unit.payload_size);
+        const auto header = streamview::bitstream::parse_h264_nal_header(data[unit.payload_offset]);
+
+        if (header.nal_unit_type == streamview::bitstream::H264NalType::Sps) {
+            ++summary.sps_count;
+            const auto sps = streamview::bitstream::parse_h264_sps(payload);
+            if (sps.status.is_ok() && sps.info.has_value()) {
+                summary.active_sps = *sps.info;
+            }
+        } else if (header.nal_unit_type == streamview::bitstream::H264NalType::Pps) {
+            ++summary.pps_count;
+        } else if ((header.nal_unit_type == streamview::bitstream::H264NalType::CodedSliceNonIdr ||
+                    header.nal_unit_type == streamview::bitstream::H264NalType::CodedSliceIdr) &&
+                   summary.active_sps.has_value()) {
+            const auto slice = streamview::bitstream::parse_h264_slice_header(
+                payload,
+                summary.active_sps->log2_max_frame_num_minus4);
+            if (slice.status.is_ok() && slice.info.has_value()) {
+                add_slice_to_summary(summary, slice.info->slice_kind);
+            }
+        }
+    }
+
+    return summary;
+}
+
+void write_stream_summary_json(std::ostream& out, const StreamSummary& summary) {
+    out << "  \"stream_summary\": {\n";
+    out << "    \"sps_count\": " << summary.sps_count << ",\n";
+    out << "    \"pps_count\": " << summary.pps_count << ",\n";
+    out << "    \"slice_count\": " << summary.slices.total << ",\n";
+    out << "    \"slice_types\": {\n";
+    out << "      \"I\": " << summary.slices.i << ",\n";
+    out << "      \"P\": " << summary.slices.p << ",\n";
+    out << "      \"B\": " << summary.slices.b << ",\n";
+    out << "      \"SP\": " << summary.slices.sp << ",\n";
+    out << "      \"SI\": " << summary.slices.si << "\n";
+    out << "    }";
+
+    if (summary.active_sps.has_value()) {
+        out << ",\n";
+        out << "    \"active_sps\": {\n";
+        out << "      \"profile_idc\": " << static_cast<int>(summary.active_sps->profile_idc) << ",\n";
+        out << "      \"level_idc\": " << static_cast<int>(summary.active_sps->level_idc) << ",\n";
+        out << "      \"seq_parameter_set_id\": " << summary.active_sps->seq_parameter_set_id << ",\n";
+        out << "      \"width\": " << summary.active_sps->width << ",\n";
+        out << "      \"height\": " << summary.active_sps->height << "\n";
+        out << "    }\n";
+    } else {
+        out << "\n";
+    }
+
+    out << "  },\n";
+}
+
 void write_analysis_json(std::ostream& out, const std::string& input_path, std::span<const std::uint8_t> data) {
     const auto units = streamview::bitstream::scan_annex_b(data);
+    const auto summary = build_stream_summary(data, units);
     std::optional<streamview::bitstream::H264SpsInfo> active_sps;
 
     out << "{\n";
@@ -72,6 +171,7 @@ void write_analysis_json(std::ostream& out, const std::string& input_path, std::
     out << ",\n";
     out << "  \"size_bytes\": " << data.size() << ",\n";
     out << "  \"nal_count\": " << units.size() << ",\n";
+    write_stream_summary_json(out, summary);
     out << "  \"nals\": [\n";
 
     for (std::size_t i = 0; i < units.size(); ++i) {
