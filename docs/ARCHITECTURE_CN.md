@@ -36,6 +36,16 @@ libs/
 - FFmpeg adapter 可以提供 packet 和 decoded preview，但 parser core 必须保持独立可测试。
 - CLI 输出是测试和未来 GUI 集成的第一个稳定 API。
 
+## 当前 MVP 模型
+
+当前最小 MVP 已形成三层结构：
+
+- `sv-bitstream`：只负责字节级和 codec 语法级解析，例如 Annex B、NAL、SPS、PPS、slice header。
+- `sv-analysis`：把 parser 结果聚合成 `StreamAnalysis`，包含 `stream_summary` 和逐 NAL 分析结果。
+- `sv-export`：把 `StreamAnalysis` 导出为 JSON。CLI 和未来 GUI 不需要重复实现 codec 字段序列化。
+
+CLI 当前只是薄入口：读取文件、调用 `analyze_h264_annex_b`、调用 `write_analysis_json`。
+
 ## 未来组件
 
 - `sv-demux`：通过 FFmpeg `libavformat` 支持 MP4/TS/MKV 输入。

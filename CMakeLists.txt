@@ -14,6 +14,7 @@ option(STREAMVIEW_BUILD_TESTS "Build StreamView tests" ON)
 
 add_subdirectory(libs/sv-core)
 add_subdirectory(libs/sv-bitstream)
+add_subdirectory(libs/sv-analysis)
 add_subdirectory(libs/sv-export)
 add_subdirectory(apps/streamview-cli)
 

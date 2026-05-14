@@ -4,7 +4,6 @@ add_executable(streamview
 
 target_link_libraries(streamview
     PRIVATE
-        StreamView::Bitstream
         StreamView::Export
 )
 

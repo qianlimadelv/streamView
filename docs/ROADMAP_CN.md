@@ -23,6 +23,8 @@
 - Exp-Golomb decoding
 - SPS/PPS 基础字段
 - 宽高推导
+- Slice header 基础字段
+- `StreamAnalysis` MVP 数据模型
 
 ## Phase 3：H.265 Elementary Streams
 
