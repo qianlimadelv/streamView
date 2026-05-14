@@ -16,6 +16,14 @@ visualization will be added incrementally.
 See `docs/PRD.md`, `docs/ARCHITECTURE.md`, and `docs/CODEC-SCOPE.md` for the
 product and engineering boundaries.
 
+中文文档：
+
+- `docs/PRD_CN.md`
+- `docs/ARCHITECTURE_CN.md`
+- `docs/CODEC-SCOPE_CN.md`
+- `docs/ROADMAP_CN.md`
+- `AGENTS_CN.md`
+
 ## Build
 
 ```bash
