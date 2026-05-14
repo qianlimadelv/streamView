@@ -25,6 +25,7 @@
 - 宽高推导
 - Slice header 基础字段
 - `StreamAnalysis` MVP 数据模型
+- CLI golden JSON 测试
 
 ## Phase 3：H.265 Elementary Streams
 

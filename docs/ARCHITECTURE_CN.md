@@ -46,6 +46,12 @@ libs/
 
 CLI 当前只是薄入口：读取文件、调用 `analyze_h264_annex_b`、调用 `write_analysis_json`。
 
+## Golden 测试
+
+CLI JSON 是当前 MVP 的稳定输出契约。`tests/golden/` 保存期望输出，`tests/samples/` 保存输入样本。
+
+任何修改 parser、analysis model 或 JSON 导出的改动，如果改变 CLI 输出，都必须同步更新 golden 文件，并确认变更是有意的。
+
 ## 未来组件
 
 - `sv-demux`：通过 FFmpeg `libavformat` 支持 MP4/TS/MKV 输入。

@@ -23,3 +23,19 @@ target_link_libraries(sv-analysis-tests
 target_compile_features(sv-analysis-tests PRIVATE cxx_std_20)
 
 add_test(NAME sv-analysis-tests COMMAND sv-analysis-tests)
+
+add_test(
+    NAME streamview-cli-golden-h264-minimal
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/h264_minimal_sps_pps_idr.json
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_minimal_sps_pps_idr.actual.json
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_golden_test.cmake
+)
+
+set_tests_properties(streamview-cli-golden-h264-minimal
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
