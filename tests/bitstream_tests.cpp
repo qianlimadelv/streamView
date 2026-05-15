@@ -8,6 +8,7 @@
 #include "streamview/bitstream/h265_pps.hpp"
 #include "streamview/bitstream/h265_slice.hpp"
 #include "streamview/bitstream/h265_sps.hpp"
+#include "streamview/bitstream/h265_vps.hpp"
 #include "streamview/bitstream/rbsp.hpp"
 
 #include <cstdint>
@@ -85,6 +86,35 @@ std::vector<std::uint8_t> make_h265_sps_payload(std::uint32_t width, std::uint32
 
     auto rbsp = writer.finish_rbsp();
     std::vector<std::uint8_t> payload{0x42, 0x01};
+    payload.insert(payload.end(), rbsp.begin(), rbsp.end());
+    return payload;
+}
+
+std::vector<std::uint8_t> make_h265_vps_payload() {
+    TestBitWriter writer;
+    writer.write_bits(0, 4);      // vps_video_parameter_set_id
+    writer.write_bit(true);       // vps_base_layer_internal_flag
+    writer.write_bit(true);       // vps_base_layer_available_flag
+    writer.write_bits(0, 6);      // vps_max_layers_minus1
+    writer.write_bits(0, 3);      // vps_max_sub_layers_minus1
+    writer.write_bit(true);       // vps_temporal_id_nesting_flag
+    writer.write_bits(0xffff, 16);
+    writer.write_bits(0, 2);      // general_profile_space
+    writer.write_bit(false);      // general_tier_flag
+    writer.write_bits(1, 5);      // general_profile_idc
+    writer.write_bits(0, 32);     // compatibility flags
+    writer.write_bits(0, 32);     // constraint flags high bits
+    writer.write_bits(0, 16);     // constraint flags low bits
+    writer.write_bits(120, 8);    // general_level_idc
+    writer.write_bit(false);      // vps_sub_layer_ordering_info_present_flag
+    writer.write_ue(0);           // vps_max_dec_pic_buffering_minus1
+    writer.write_ue(0);           // vps_max_num_reorder_pics
+    writer.write_ue(0);           // vps_max_latency_increase_plus1
+    writer.write_bits(0, 6);      // vps_max_layer_id
+    writer.write_ue(0);           // vps_num_layer_sets_minus1
+
+    auto rbsp = writer.finish_rbsp();
+    std::vector<std::uint8_t> payload{0x40, 0x01};
     payload.insert(payload.end(), rbsp.begin(), rbsp.end());
     return payload;
 }
@@ -267,6 +297,26 @@ void test_parses_h265_nal_header() {
     require(streamview::bitstream::h265_nal_type_is_vcl(idr.nal_unit_type), "H.265 IDR is VCL");
 }
 
+void test_parses_h265_vps_baseline_fields() {
+    const auto vps = make_h265_vps_payload();
+
+    const auto result = streamview::bitstream::parse_h265_vps(vps);
+
+    require(result.status.is_ok(), "H.265 VPS parse status");
+    require(result.info.has_value(), "H.265 VPS info present");
+    require(result.info->profile_idc == 1, "H.265 VPS profile_idc");
+    require(result.info->level_idc == 120, "H.265 VPS level_idc");
+    require(result.info->video_parameter_set_id == 0, "H.265 VPS id");
+    require(result.info->base_layer_internal_flag, "H.265 VPS base internal");
+    require(result.info->base_layer_available_flag, "H.265 VPS base available");
+    require(result.info->max_layers_minus1 == 0, "H.265 VPS max layers");
+    require(result.info->max_sub_layers_minus1 == 0, "H.265 VPS max sub layers");
+    require(result.info->temporal_id_nesting_flag, "H.265 VPS temporal nesting");
+    require(result.info->max_dec_pic_buffering_minus1 == 0, "H.265 VPS max dec pic buffering");
+    require(result.info->max_layer_id == 0, "H.265 VPS max layer id");
+    require(result.info->num_layer_sets_minus1 == 0, "H.265 VPS layer set count");
+}
+
 void test_parses_h265_sps_dimensions() {
     const auto sps = make_h265_sps_payload(640, 360);
 
@@ -320,10 +370,12 @@ void test_parses_h265_pps_baseline_fields() {
 }
 
 void test_rejects_truncated_h265_parameter_sets_and_slice() {
+    const std::vector<std::uint8_t> vps_payload{0x40, 0x01};
     const std::vector<std::uint8_t> sps_payload{0x42, 0x01};
     const std::vector<std::uint8_t> pps_payload{0x44, 0x01};
     const std::vector<std::uint8_t> slice_payload{0x26, 0x01};
 
+    const auto vps = streamview::bitstream::parse_h265_vps(vps_payload);
     const auto sps = streamview::bitstream::parse_h265_sps(sps_payload);
     const auto pps = streamview::bitstream::parse_h265_pps(pps_payload);
     const auto slice = streamview::bitstream::parse_h265_slice_header(
@@ -331,6 +383,7 @@ void test_rejects_truncated_h265_parameter_sets_and_slice() {
         streamview::bitstream::H265NalType::IdrWRadl,
         0);
 
+    require(!vps.status.is_ok() && !vps.info.has_value(), "truncated H.265 VPS should fail");
     require(!sps.status.is_ok() && !sps.info.has_value(), "truncated H.265 SPS should fail");
     require(!pps.status.is_ok() && !pps.info.has_value(), "truncated H.265 PPS should fail");
     require(!slice.status.is_ok() && !slice.info.has_value(), "truncated H.265 slice should fail");
@@ -351,6 +404,7 @@ int main() {
     test_parses_h264_slice_header_prefix();
     test_rejects_truncated_h264_parameter_sets_and_slice();
     test_parses_h265_nal_header();
+    test_parses_h265_vps_baseline_fields();
     test_parses_h265_sps_dimensions();
     test_parses_h265_pps_baseline_fields();
     test_parses_h265_slice_header_prefix();

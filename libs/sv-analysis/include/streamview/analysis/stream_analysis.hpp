@@ -9,6 +9,7 @@
 #include "streamview/bitstream/h265_pps.hpp"
 #include "streamview/bitstream/h265_slice.hpp"
 #include "streamview/bitstream/h265_sps.hpp"
+#include "streamview/bitstream/h265_vps.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -30,6 +31,7 @@ struct SliceStats {
 
 struct StreamSummary {
     std::optional<bitstream::H264SpsInfo> active_sps;
+    std::optional<bitstream::H265VpsInfo> active_h265_vps;
     std::optional<bitstream::H265SpsInfo> active_h265_sps;
     std::size_t vps_count{};
     std::size_t sps_count{};
@@ -52,9 +54,11 @@ struct H264NalAnalysis {
 
 struct H265NalAnalysis {
     bitstream::H265NalHeader header{};
+    std::optional<bitstream::H265VpsInfo> vps;
     std::optional<bitstream::H265SpsInfo> sps;
     std::optional<bitstream::H265PpsInfo> pps;
     std::optional<bitstream::H265SliceHeaderInfo> slice;
+    std::optional<std::string> vps_parse_error;
     std::optional<std::string> sps_parse_error;
     std::optional<std::string> pps_parse_error;
     std::optional<std::string> slice_parse_error;

@@ -78,6 +78,35 @@ std::vector<std::uint8_t> make_h265_sps_payload(std::uint32_t width, std::uint32
     return payload;
 }
 
+std::vector<std::uint8_t> make_h265_vps_payload() {
+    TestBitWriter writer;
+    writer.write_bits(0, 4);
+    writer.write_bit(true);
+    writer.write_bit(true);
+    writer.write_bits(0, 6);
+    writer.write_bits(0, 3);
+    writer.write_bit(true);
+    writer.write_bits(0xffff, 16);
+    writer.write_bits(0, 2);
+    writer.write_bit(false);
+    writer.write_bits(1, 5);
+    writer.write_bits(0, 32);
+    writer.write_bits(0, 32);
+    writer.write_bits(0, 16);
+    writer.write_bits(120, 8);
+    writer.write_bit(false);
+    writer.write_ue(0);
+    writer.write_ue(0);
+    writer.write_ue(0);
+    writer.write_bits(0, 6);
+    writer.write_ue(0);
+
+    auto rbsp = writer.finish_rbsp();
+    std::vector<std::uint8_t> payload{0x40, 0x01};
+    payload.insert(payload.end(), rbsp.begin(), rbsp.end());
+    return payload;
+}
+
 void require(bool condition, std::string_view message) {
     if (!condition) {
         std::cerr << "FAIL: " << message << "\n";
@@ -102,9 +131,11 @@ std::vector<std::uint8_t> make_minimal_h264_stream() {
 std::vector<std::uint8_t> make_minimal_h265_stream() {
     std::vector<std::uint8_t> stream{
         0x00, 0x00, 0x00, 0x01,
-        0x40, 0x01, 0x0c,
-        0x00, 0x00, 0x01,
     };
+    const auto vps = make_h265_vps_payload();
+    stream.insert(stream.end(), vps.begin(), vps.end());
+    const std::vector<std::uint8_t> sps_start{0x00, 0x00, 0x01};
+    stream.insert(stream.end(), sps_start.begin(), sps_start.end());
     const auto sps = make_h265_sps_payload(640, 360);
     stream.insert(stream.end(), sps.begin(), sps.end());
     const std::vector<std::uint8_t> tail{
@@ -161,6 +192,9 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.summary.vps_count == 1, "H.265 VPS count");
     require(analysis.summary.sps_count == 1, "H.265 SPS count");
     require(analysis.summary.pps_count == 1, "H.265 PPS count");
+    require(analysis.summary.active_h265_vps.has_value(), "H.265 active VPS");
+    require(analysis.summary.active_h265_vps->profile_idc == 1, "H.265 summary VPS profile");
+    require(analysis.summary.active_h265_vps->level_idc == 120, "H.265 summary VPS level");
     require(analysis.summary.active_h265_sps.has_value(), "H.265 active SPS");
     require(analysis.summary.active_h265_sps->width == 640, "H.265 summary width");
     require(analysis.summary.active_h265_sps->height == 360, "H.265 summary height");
@@ -170,6 +204,7 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.summary.slices.i == 1, "H.265 I slice count");
     require(analysis.nals[0].h265.has_value(), "first H.265 NAL");
     require(analysis.nals[0].h265->header.nal_unit_type == streamview::bitstream::H265NalType::Vps, "first H.265 VPS");
+    require(analysis.nals[0].h265->vps.has_value(), "first H.265 VPS info");
     require(analysis.nals[1].h265.has_value() && analysis.nals[1].h265->sps.has_value(), "second H.265 SPS");
     require(analysis.nals[2].h265.has_value() && analysis.nals[2].h265->pps.has_value(), "third H.265 PPS");
     require(analysis.nals[3].h265->header.nal_unit_type == streamview::bitstream::H265NalType::IdrWRadl, "fourth H.265 IDR");
@@ -215,6 +250,8 @@ void test_records_h264_parse_errors_without_frames() {
 void test_records_h265_parse_errors_without_crashing() {
     const std::vector<std::uint8_t> stream{
         0x00, 0x00, 0x01,
+        0x40, 0x01,
+        0x00, 0x00, 0x01,
         0x42, 0x01,
         0x00, 0x00, 0x01,
         0x44, 0x01,
@@ -224,18 +261,21 @@ void test_records_h265_parse_errors_without_crashing() {
 
     const auto analysis = streamview::analysis::analyze_h265_annex_b("bad.h265", stream);
 
-    require(analysis.nals.size() == 3, "bad H.265 NAL count");
+    require(analysis.nals.size() == 4, "bad H.265 NAL count");
+    require(analysis.summary.vps_count == 1, "bad H.265 VPS count");
     require(analysis.summary.sps_count == 1, "bad H.265 SPS count");
     require(analysis.summary.pps_count == 1, "bad H.265 PPS count");
     require(analysis.summary.frame_count == 0, "bad H.265 frame count");
     require(analysis.summary.slices.total == 0, "bad H.265 parsed slice count");
     require(!analysis.summary.active_h265_sps.has_value(), "bad H.265 active SPS absent");
-    require(analysis.nals[0].h265.has_value(), "bad H.265 SPS analysis present");
-    require(analysis.nals[0].h265->sps_parse_error.has_value(), "bad H.265 SPS error");
-    require(analysis.nals[1].h265.has_value(), "bad H.265 PPS analysis present");
-    require(analysis.nals[1].h265->pps_parse_error.has_value(), "bad H.265 PPS error");
-    require(analysis.nals[2].h265.has_value(), "bad H.265 slice analysis present");
-    require(analysis.nals[2].h265->slice_parse_error.has_value(), "bad H.265 slice error");
+    require(analysis.nals[0].h265.has_value(), "bad H.265 VPS analysis present");
+    require(analysis.nals[0].h265->vps_parse_error.has_value(), "bad H.265 VPS error");
+    require(analysis.nals[1].h265.has_value(), "bad H.265 SPS analysis present");
+    require(analysis.nals[1].h265->sps_parse_error.has_value(), "bad H.265 SPS error");
+    require(analysis.nals[2].h265.has_value(), "bad H.265 PPS analysis present");
+    require(analysis.nals[2].h265->pps_parse_error.has_value(), "bad H.265 PPS error");
+    require(analysis.nals[3].h265.has_value(), "bad H.265 slice analysis present");
+    require(analysis.nals[3].h265->slice_parse_error.has_value(), "bad H.265 slice error");
     require(analysis.frames.empty(), "bad H.265 frames empty");
 }
 

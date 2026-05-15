@@ -2,7 +2,7 @@
   "format": "annex_b",
   "codec_guess": "h265",
   "input": "tests/samples/h265/minimal_vps_sps_pps_idr.h265",
-  "size_bytes": 43,
+  "size_bytes": 60,
   "nal_count": 4,
   "stream_summary": {
     "vps_count": 1,
@@ -18,6 +18,14 @@
       "B": 0,
       "SP": 0,
       "SI": 0
+    },
+    "active_h265_vps": {
+      "profile_idc": 1,
+      "tier_flag": false,
+      "level_idc": 120,
+      "video_parameter_set_id": 0,
+      "max_layers_minus1": 0,
+      "max_sub_layers_minus1": 0
     },
     "active_h265_sps": {
       "profile_idc": 1,
@@ -36,7 +44,7 @@
       "frame_type": "I",
       "is_keyframe": true,
       "size_bytes": 6,
-      "first_payload_offset": 40,
+      "first_payload_offset": 57,
       "nal_indices": [3]
     }
   ],
@@ -57,20 +65,36 @@
       "start_code_offset": 0,
       "start_code_size": 4,
       "payload_offset": 4,
-      "payload_size": 3,
+      "payload_size": 20,
       "h265": {
         "forbidden_zero_bit": 0,
         "nal_unit_type": 32,
         "nal_unit_type_name": "vps",
         "nuh_layer_id": 0,
-        "nuh_temporal_id_plus1": 1
+        "nuh_temporal_id_plus1": 1,
+        "vps": {
+          "profile_idc": 1,
+          "tier_flag": false,
+          "level_idc": 120,
+          "video_parameter_set_id": 0,
+          "base_layer_internal_flag": true,
+          "base_layer_available_flag": true,
+          "max_layers_minus1": 0,
+          "max_sub_layers_minus1": 0,
+          "temporal_id_nesting_flag": true,
+          "max_dec_pic_buffering_minus1": 0,
+          "max_num_reorder_pics": 0,
+          "max_latency_increase_plus1": 0,
+          "max_layer_id": 0,
+          "num_layer_sets_minus1": 0
+        }
       }
     },
     {
       "index": 1,
-      "start_code_offset": 7,
+      "start_code_offset": 24,
       "start_code_size": 3,
-      "payload_offset": 10,
+      "payload_offset": 27,
       "payload_size": 21,
       "h265": {
         "forbidden_zero_bit": 0,
@@ -96,9 +120,9 @@
     },
     {
       "index": 2,
-      "start_code_offset": 31,
+      "start_code_offset": 48,
       "start_code_size": 3,
-      "payload_offset": 34,
+      "payload_offset": 51,
       "payload_size": 3,
       "h265": {
         "forbidden_zero_bit": 0,
@@ -117,9 +141,9 @@
     },
     {
       "index": 3,
-      "start_code_offset": 37,
+      "start_code_offset": 54,
       "start_code_size": 3,
-      "payload_offset": 40,
+      "payload_offset": 57,
       "payload_size": 3,
       "h265": {
         "forbidden_zero_bit": 0,

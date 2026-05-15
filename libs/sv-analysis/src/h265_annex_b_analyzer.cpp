@@ -92,6 +92,14 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
             nal.h265->header = bitstream::parse_h265_nal_header(data[unit.payload_offset], data[unit.payload_offset + 1]);
             if (nal.h265->header.nal_unit_type == bitstream::H265NalType::Vps) {
                 ++analysis.summary.vps_count;
+                const auto payload = data.subspan(unit.payload_offset, unit.payload_size);
+                const auto vps = bitstream::parse_h265_vps(payload);
+                if (vps.status.is_ok() && vps.info.has_value()) {
+                    nal.h265->vps = *vps.info;
+                    analysis.summary.active_h265_vps = *vps.info;
+                } else {
+                    nal.h265->vps_parse_error = vps.status.message();
+                }
             } else if (nal.h265->header.nal_unit_type == bitstream::H265NalType::Sps) {
                 ++analysis.summary.sps_count;
                 const auto payload = data.subspan(unit.payload_offset, unit.payload_size);

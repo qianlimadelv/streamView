@@ -36,6 +36,16 @@ void write_stream_summary_json(std::ostream& out, const analysis::StreamSummary&
         out << "    }\n";
     } else if (summary.active_h265_sps.has_value()) {
         out << ",\n";
+        if (summary.active_h265_vps.has_value()) {
+            out << "    \"active_h265_vps\": {\n";
+            out << "      \"profile_idc\": " << static_cast<int>(summary.active_h265_vps->profile_idc) << ",\n";
+            out << "      \"tier_flag\": " << (summary.active_h265_vps->tier_flag ? "true" : "false") << ",\n";
+            out << "      \"level_idc\": " << static_cast<int>(summary.active_h265_vps->level_idc) << ",\n";
+            out << "      \"video_parameter_set_id\": " << summary.active_h265_vps->video_parameter_set_id << ",\n";
+            out << "      \"max_layers_minus1\": " << summary.active_h265_vps->max_layers_minus1 << ",\n";
+            out << "      \"max_sub_layers_minus1\": " << summary.active_h265_vps->max_sub_layers_minus1 << "\n";
+            out << "    },\n";
+        }
         out << "    \"active_h265_sps\": {\n";
         out << "      \"profile_idc\": " << static_cast<int>(summary.active_h265_sps->profile_idc) << ",\n";
         out << "      \"tier_flag\": " << (summary.active_h265_sps->tier_flag ? "true" : "false") << ",\n";
@@ -77,6 +87,25 @@ void write_pps_json(std::ostream& out, const bitstream::H264PpsInfo& pps) {
     out << "          \"bottom_field_pic_order_in_frame_present_flag\": "
         << (pps.bottom_field_pic_order_in_frame_present_flag ? "true" : "false") << ",\n";
     out << "          \"num_slice_groups_minus1\": " << pps.num_slice_groups_minus1 << "\n";
+    out << "        }\n";
+}
+
+void write_h265_vps_json(std::ostream& out, const bitstream::H265VpsInfo& vps) {
+    out << "        \"vps\": {\n";
+    out << "          \"profile_idc\": " << static_cast<int>(vps.profile_idc) << ",\n";
+    out << "          \"tier_flag\": " << (vps.tier_flag ? "true" : "false") << ",\n";
+    out << "          \"level_idc\": " << static_cast<int>(vps.level_idc) << ",\n";
+    out << "          \"video_parameter_set_id\": " << vps.video_parameter_set_id << ",\n";
+    out << "          \"base_layer_internal_flag\": " << (vps.base_layer_internal_flag ? "true" : "false") << ",\n";
+    out << "          \"base_layer_available_flag\": " << (vps.base_layer_available_flag ? "true" : "false") << ",\n";
+    out << "          \"max_layers_minus1\": " << vps.max_layers_minus1 << ",\n";
+    out << "          \"max_sub_layers_minus1\": " << vps.max_sub_layers_minus1 << ",\n";
+    out << "          \"temporal_id_nesting_flag\": " << (vps.temporal_id_nesting_flag ? "true" : "false") << ",\n";
+    out << "          \"max_dec_pic_buffering_minus1\": " << vps.max_dec_pic_buffering_minus1 << ",\n";
+    out << "          \"max_num_reorder_pics\": " << vps.max_num_reorder_pics << ",\n";
+    out << "          \"max_latency_increase_plus1\": " << vps.max_latency_increase_plus1 << ",\n";
+    out << "          \"max_layer_id\": " << vps.max_layer_id << ",\n";
+    out << "          \"num_layer_sets_minus1\": " << vps.num_layer_sets_minus1 << "\n";
     out << "        }\n";
 }
 
@@ -190,7 +219,10 @@ void write_h265_details_json(std::ostream& out, const analysis::H265NalAnalysis&
     out << ",\n";
     out << "        \"nuh_layer_id\": " << static_cast<int>(h265.header.nuh_layer_id) << ",\n";
     out << "        \"nuh_temporal_id_plus1\": " << static_cast<int>(h265.header.nuh_temporal_id_plus1);
-    if (h265.sps.has_value()) {
+    if (h265.vps.has_value()) {
+        out << ",\n";
+        write_h265_vps_json(out, *h265.vps);
+    } else if (h265.sps.has_value()) {
         out << ",\n";
         write_h265_sps_json(out, *h265.sps);
     } else if (h265.pps.has_value()) {
@@ -199,6 +231,11 @@ void write_h265_details_json(std::ostream& out, const analysis::H265NalAnalysis&
     } else if (h265.slice.has_value()) {
         out << ",\n";
         write_h265_slice_json(out, *h265.slice);
+    } else if (h265.vps_parse_error.has_value()) {
+        out << ",\n";
+        out << "        \"vps_parse_error\": ";
+        write_json_string(out, *h265.vps_parse_error);
+        out << "\n";
     } else if (h265.sps_parse_error.has_value()) {
         out << ",\n";
         out << "        \"sps_parse_error\": ";

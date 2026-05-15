@@ -9,6 +9,7 @@ add_library(sv-bitstream
     src/h265_pps.cpp
     src/h265_slice.cpp
     src/h265_sps.cpp
+    src/h265_vps.cpp
     src/rbsp.cpp
 )
 
