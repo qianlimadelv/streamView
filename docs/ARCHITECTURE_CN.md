@@ -41,10 +41,12 @@ libs/
 当前最小 MVP 已形成三层结构：
 
 - `sv-bitstream`：只负责字节级和 codec 语法级解析，例如 Annex B、NAL、SPS、PPS、slice header。
-- `sv-analysis`：把 parser 结果聚合成 `StreamAnalysis`，包含 `stream_summary` 和逐 NAL 分析结果。
+- `sv-analysis`：把 parser 结果聚合成 `StreamAnalysis`，包含 `stream_summary`、`frames` 和逐 NAL 分析结果。
 - `sv-export`：把 `StreamAnalysis` 导出为 JSON。CLI 和未来 GUI 不需要重复实现 codec 字段序列化。
 
 CLI 当前只是薄入口：读取文件、调用 `analyze_h264_annex_b`、调用 `write_analysis_json`。
+
+当前 `FrameAnalysis` 仍是最小模型：H.264 以成功解析的 slice 生成 frame，H.265 以 VCL NAL 生成 frame。后续需要继续补充多 slice 聚合、POC 和容器时间戳。
 
 ## Golden 测试
 

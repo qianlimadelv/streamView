@@ -53,6 +53,8 @@ void test_analyzes_minimal_h264_stream() {
     require(analysis.nals.size() == 3, "analysis NAL count");
     require(analysis.summary.sps_count == 1, "summary SPS count");
     require(analysis.summary.pps_count == 1, "summary PPS count");
+    require(analysis.summary.frame_count == 1, "summary frame count");
+    require(analysis.summary.keyframe_count == 1, "summary keyframe count");
     require(analysis.summary.slices.total == 1, "summary slice count");
     require(analysis.summary.slices.i == 1, "summary I slice count");
     require(analysis.summary.active_sps.has_value(), "summary active SPS");
@@ -61,6 +63,11 @@ void test_analyzes_minimal_h264_stream() {
     require(analysis.nals[0].h264.has_value() && analysis.nals[0].h264->sps.has_value(), "first NAL SPS");
     require(analysis.nals[1].h264.has_value() && analysis.nals[1].h264->pps.has_value(), "second NAL PPS");
     require(analysis.nals[2].h264.has_value() && analysis.nals[2].h264->slice.has_value(), "third NAL slice");
+    require(analysis.frames.size() == 1, "H.264 frame count");
+    require(analysis.frames[0].codec == "h264", "H.264 frame codec");
+    require(analysis.frames[0].frame_type == "I", "H.264 frame type");
+    require(analysis.frames[0].is_keyframe, "H.264 frame keyframe");
+    require(analysis.frames[0].nal_indices.size() == 1 && analysis.frames[0].nal_indices[0] == 2, "H.264 frame NAL index");
 }
 
 void test_analyzes_minimal_h265_stream() {
@@ -73,10 +80,17 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.summary.vps_count == 1, "H.265 VPS count");
     require(analysis.summary.sps_count == 1, "H.265 SPS count");
     require(analysis.summary.pps_count == 1, "H.265 PPS count");
+    require(analysis.summary.frame_count == 1, "H.265 frame count");
+    require(analysis.summary.keyframe_count == 1, "H.265 keyframe count");
     require(analysis.summary.slices.total == 1, "H.265 VCL count");
     require(analysis.nals[0].h265.has_value(), "first H.265 NAL");
     require(analysis.nals[0].h265->header.nal_unit_type == streamview::bitstream::H265NalType::Vps, "first H.265 VPS");
     require(analysis.nals[3].h265->header.nal_unit_type == streamview::bitstream::H265NalType::IdrWRadl, "fourth H.265 IDR");
+    require(analysis.frames.size() == 1, "H.265 frames size");
+    require(analysis.frames[0].codec == "h265", "H.265 frame codec");
+    require(analysis.frames[0].frame_type == "IDR", "H.265 frame type");
+    require(analysis.frames[0].is_keyframe, "H.265 frame keyframe");
+    require(analysis.frames[0].nal_indices.size() == 1 && analysis.frames[0].nal_indices[0] == 3, "H.265 frame NAL index");
 }
 
 } // namespace

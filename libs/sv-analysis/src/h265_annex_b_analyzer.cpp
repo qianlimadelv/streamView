@@ -3,6 +3,45 @@
 #include <utility>
 
 namespace streamview::analysis {
+namespace {
+
+std::string h265_frame_type_name(bitstream::H265NalType type) {
+    if (type == bitstream::H265NalType::IdrWRadl || type == bitstream::H265NalType::IdrNLp) {
+        return "IDR";
+    }
+    if (type == bitstream::H265NalType::CraNut) {
+        return "CRA";
+    }
+    return "VCL";
+}
+
+bool h265_nal_is_keyframe(bitstream::H265NalType type) {
+    return type == bitstream::H265NalType::IdrWRadl || type == bitstream::H265NalType::IdrNLp ||
+           type == bitstream::H265NalType::CraNut;
+}
+
+void add_h265_frame(StreamAnalysis& analysis, const NalAnalysis& nal) {
+    if (!nal.h265.has_value() || !bitstream::h265_nal_type_is_vcl(nal.h265->header.nal_unit_type)) {
+        return;
+    }
+
+    FrameAnalysis frame{};
+    frame.index = analysis.frames.size();
+    frame.codec = "h265";
+    frame.frame_type = h265_frame_type_name(nal.h265->header.nal_unit_type);
+    frame.is_keyframe = h265_nal_is_keyframe(nal.h265->header.nal_unit_type);
+    frame.nal_indices.push_back(nal.index);
+    frame.size_bytes = nal.unit.start_code_size + nal.unit.payload_size;
+    frame.first_payload_offset = nal.unit.payload_offset;
+
+    ++analysis.summary.frame_count;
+    if (frame.is_keyframe) {
+        ++analysis.summary.keyframe_count;
+    }
+    analysis.frames.push_back(std::move(frame));
+}
+
+} // namespace
 
 StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std::uint8_t> data) {
     StreamAnalysis analysis{};
@@ -30,6 +69,7 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                 ++analysis.summary.pps_count;
             } else if (bitstream::h265_nal_type_is_vcl(nal.h265->header.nal_unit_type)) {
                 ++analysis.summary.slices.total;
+                add_h265_frame(analysis, nal);
             }
         }
 

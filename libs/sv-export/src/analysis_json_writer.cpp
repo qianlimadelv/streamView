@@ -13,6 +13,8 @@ void write_stream_summary_json(std::ostream& out, const analysis::StreamSummary&
     out << "    \"vps_count\": " << summary.vps_count << ",\n";
     out << "    \"sps_count\": " << summary.sps_count << ",\n";
     out << "    \"pps_count\": " << summary.pps_count << ",\n";
+    out << "    \"frame_count\": " << summary.frame_count << ",\n";
+    out << "    \"keyframe_count\": " << summary.keyframe_count << ",\n";
     out << "    \"slice_count\": " << summary.slices.total << ",\n";
     out << "    \"slice_types\": {\n";
     out << "      \"I\": " << summary.slices.i << ",\n";
@@ -130,6 +132,31 @@ void write_h265_details_json(std::ostream& out, const analysis::H265NalAnalysis&
     out << "      }\n";
 }
 
+void write_frames_json(std::ostream& out, const std::vector<analysis::FrameAnalysis>& frames) {
+    out << "  \"frames\": [\n";
+    for (std::size_t i = 0; i < frames.size(); ++i) {
+        const auto& frame = frames[i];
+        out << "    {\n";
+        out << "      \"index\": " << frame.index << ",\n";
+        out << "      \"codec\": ";
+        write_json_string(out, frame.codec);
+        out << ",\n";
+        out << "      \"frame_type\": ";
+        write_json_string(out, frame.frame_type);
+        out << ",\n";
+        out << "      \"is_keyframe\": " << (frame.is_keyframe ? "true" : "false") << ",\n";
+        out << "      \"size_bytes\": " << frame.size_bytes << ",\n";
+        out << "      \"first_payload_offset\": " << frame.first_payload_offset << ",\n";
+        out << "      \"nal_indices\": [";
+        for (std::size_t j = 0; j < frame.nal_indices.size(); ++j) {
+            out << frame.nal_indices[j] << (j + 1 == frame.nal_indices.size() ? "" : ", ");
+        }
+        out << "]\n";
+        out << "    }" << (i + 1 == frames.size() ? "\n" : ",\n");
+    }
+    out << "  ],\n";
+}
+
 } // namespace
 
 void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis) {
@@ -146,6 +173,7 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
     out << "  \"size_bytes\": " << analysis.size_bytes << ",\n";
     out << "  \"nal_count\": " << analysis.nals.size() << ",\n";
     write_stream_summary_json(out, analysis.summary);
+    write_frames_json(out, analysis.frames);
     out << "  \"nals\": [\n";
 
     for (std::size_t i = 0; i < analysis.nals.size(); ++i) {

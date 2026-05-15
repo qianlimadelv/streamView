@@ -30,6 +30,8 @@ struct StreamSummary {
     std::size_t vps_count{};
     std::size_t sps_count{};
     std::size_t pps_count{};
+    std::size_t frame_count{};
+    std::size_t keyframe_count{};
     SliceStats slices;
 };
 
@@ -54,6 +56,16 @@ struct NalAnalysis {
     std::optional<H265NalAnalysis> h265;
 };
 
+struct FrameAnalysis {
+    std::size_t index{};
+    std::string codec;
+    std::string frame_type;
+    bool is_keyframe{};
+    std::vector<std::size_t> nal_indices;
+    std::size_t size_bytes{};
+    std::size_t first_payload_offset{};
+};
+
 struct StreamAnalysis {
     std::string input_path;
     std::string format{"annex_b"};
@@ -61,6 +73,7 @@ struct StreamAnalysis {
     std::size_t size_bytes{};
     StreamSummary summary;
     std::vector<NalAnalysis> nals;
+    std::vector<FrameAnalysis> frames;
 };
 
 [[nodiscard]] StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std::uint8_t> data);

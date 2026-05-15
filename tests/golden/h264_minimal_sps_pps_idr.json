@@ -8,6 +8,8 @@
     "vps_count": 0,
     "sps_count": 1,
     "pps_count": 1,
+    "frame_count": 1,
+    "keyframe_count": 1,
     "slice_count": 1,
     "slice_types": {
       "I": 1,
@@ -24,6 +26,17 @@
       "height": 360
     }
   },
+  "frames": [
+    {
+      "index": 0,
+      "codec": "h264",
+      "frame_type": "I",
+      "is_keyframe": true,
+      "size_bytes": 6,
+      "first_payload_offset": 40,
+      "nal_indices": [2]
+    }
+  ],
   "nals": [
     {
       "index": 0,

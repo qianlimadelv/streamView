@@ -55,6 +55,7 @@
 
 - Slice header 解析
 - GOP 分类
+- FrameAnalysis MVP
 - QP 统计
 - CTU/block 可行性研究
 - 运动矢量可行性研究

@@ -26,6 +26,36 @@ void add_slice_to_summary(StreamSummary& summary, bitstream::H264SliceKind kind)
     }
 }
 
+std::string h264_frame_type_name(bitstream::H264SliceKind kind) {
+    return std::string(bitstream::h264_slice_kind_name(kind));
+}
+
+bool h264_slice_is_keyframe(bitstream::H264NalType nal_type, bitstream::H264SliceKind slice_kind) {
+    return nal_type == bitstream::H264NalType::CodedSliceIdr || slice_kind == bitstream::H264SliceKind::I ||
+           slice_kind == bitstream::H264SliceKind::SI;
+}
+
+void add_h264_frame(StreamAnalysis& analysis, const NalAnalysis& nal) {
+    if (!nal.h264.has_value() || !nal.h264->slice.has_value()) {
+        return;
+    }
+
+    FrameAnalysis frame{};
+    frame.index = analysis.frames.size();
+    frame.codec = "h264";
+    frame.frame_type = h264_frame_type_name(nal.h264->slice->slice_kind);
+    frame.is_keyframe = h264_slice_is_keyframe(nal.h264->header.nal_unit_type, nal.h264->slice->slice_kind);
+    frame.nal_indices.push_back(nal.index);
+    frame.size_bytes = nal.unit.start_code_size + nal.unit.payload_size;
+    frame.first_payload_offset = nal.unit.payload_offset;
+
+    ++analysis.summary.frame_count;
+    if (frame.is_keyframe) {
+        ++analysis.summary.keyframe_count;
+    }
+    analysis.frames.push_back(std::move(frame));
+}
+
 } // namespace
 
 StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std::uint8_t> data) {
@@ -71,6 +101,7 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
                 if (slice.status.is_ok() && slice.info.has_value()) {
                     nal.h264->slice = *slice.info;
                     add_slice_to_summary(analysis.summary, slice.info->slice_kind);
+                    add_h264_frame(analysis, nal);
                 } else {
                     nal.h264->slice_parse_error = slice.status.message();
                 }
