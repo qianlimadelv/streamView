@@ -1,0 +1,78 @@
+{
+  "format": "annex_b",
+  "codec_guess": "h265",
+  "input": "tests/samples/h265/minimal_vps_sps_pps_idr.h265",
+  "size_bytes": 25,
+  "nal_count": 4,
+  "stream_summary": {
+    "vps_count": 1,
+    "sps_count": 1,
+    "pps_count": 1,
+    "slice_count": 1,
+    "slice_types": {
+      "I": 0,
+      "P": 0,
+      "B": 0,
+      "SP": 0,
+      "SI": 0
+    }
+  },
+  "nals": [
+    {
+      "index": 0,
+      "start_code_offset": 0,
+      "start_code_size": 4,
+      "payload_offset": 4,
+      "payload_size": 3,
+      "h265": {
+        "forbidden_zero_bit": 0,
+        "nal_unit_type": 32,
+        "nal_unit_type_name": "vps",
+        "nuh_layer_id": 0,
+        "nuh_temporal_id_plus1": 1
+      }
+    },
+    {
+      "index": 1,
+      "start_code_offset": 7,
+      "start_code_size": 3,
+      "payload_offset": 10,
+      "payload_size": 3,
+      "h265": {
+        "forbidden_zero_bit": 0,
+        "nal_unit_type": 33,
+        "nal_unit_type_name": "sps",
+        "nuh_layer_id": 0,
+        "nuh_temporal_id_plus1": 1
+      }
+    },
+    {
+      "index": 2,
+      "start_code_offset": 13,
+      "start_code_size": 3,
+      "payload_offset": 16,
+      "payload_size": 3,
+      "h265": {
+        "forbidden_zero_bit": 0,
+        "nal_unit_type": 34,
+        "nal_unit_type_name": "pps",
+        "nuh_layer_id": 0,
+        "nuh_temporal_id_plus1": 1
+      }
+    },
+    {
+      "index": 3,
+      "start_code_offset": 19,
+      "start_code_size": 3,
+      "payload_offset": 22,
+      "payload_size": 3,
+      "h265": {
+        "forbidden_zero_bit": 0,
+        "nal_unit_type": 19,
+        "nal_unit_type_name": "idr_w_radl",
+        "nuh_layer_id": 0,
+        "nuh_temporal_id_plus1": 1
+      }
+    }
+  ]
+}

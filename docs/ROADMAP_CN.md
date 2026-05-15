@@ -29,9 +29,12 @@
 
 ## Phase 3：H.265 Elementary Streams
 
-- 复用 H.265 NAL scanner
-- VPS/SPS/PPS 基础解析
-- 统一 stream model
+- 复用 Annex B scanner
+- H.265 NAL header 解析
+- VPS/SPS/PPS 识别
+- VCL NAL 计数
+- H.265 golden JSON 测试
+- 后续补 VPS/SPS/PPS 字段解析和宽高推导
 
 ## Phase 4：Container Input
 

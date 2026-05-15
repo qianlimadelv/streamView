@@ -5,6 +5,7 @@
   "size_bytes": 43,
   "nal_count": 3,
   "stream_summary": {
+    "vps_count": 0,
     "sps_count": 1,
     "pps_count": 1,
     "slice_count": 1,

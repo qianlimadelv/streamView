@@ -4,6 +4,7 @@
 #include "streamview/bitstream/h264_pps.hpp"
 #include "streamview/bitstream/h264_slice.hpp"
 #include "streamview/bitstream/h264_sps.hpp"
+#include "streamview/bitstream/h265_nal.hpp"
 #include "streamview/bitstream/rbsp.hpp"
 
 #include <cstdint>
@@ -166,6 +167,19 @@ void test_parses_h264_slice_header_prefix() {
     require(streamview::bitstream::h264_slice_kind_name(result.info->slice_kind) == "I", "slice kind name");
 }
 
+void test_parses_h265_nal_header() {
+    const auto vps = streamview::bitstream::parse_h265_nal_header(0x40, 0x01);
+    require(vps.forbidden_zero_bit == 0, "H.265 VPS forbidden_zero_bit");
+    require(vps.nal_unit_type == streamview::bitstream::H265NalType::Vps, "H.265 VPS nal_unit_type");
+    require(vps.nuh_layer_id == 0, "H.265 VPS nuh_layer_id");
+    require(vps.nuh_temporal_id_plus1 == 1, "H.265 VPS temporal id");
+    require(streamview::bitstream::h265_nal_type_name(vps.nal_unit_type) == "vps", "H.265 VPS type name");
+
+    const auto idr = streamview::bitstream::parse_h265_nal_header(0x26, 0x01);
+    require(idr.nal_unit_type == streamview::bitstream::H265NalType::IdrWRadl, "H.265 IDR nal_unit_type");
+    require(streamview::bitstream::h265_nal_type_is_vcl(idr.nal_unit_type), "H.265 IDR is VCL");
+}
+
 } // namespace
 
 int main() {
@@ -179,5 +193,6 @@ int main() {
     test_parses_h264_sps_dimensions();
     test_parses_h264_pps_baseline_fields();
     test_parses_h264_slice_header_prefix();
+    test_parses_h265_nal_header();
     return 0;
 }

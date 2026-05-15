@@ -1,5 +1,6 @@
 add_library(sv-analysis
     src/h264_annex_b_analyzer.cpp
+    src/h265_annex_b_analyzer.cpp
 )
 
 add_library(StreamView::Analysis ALIAS sv-analysis)

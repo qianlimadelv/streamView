@@ -2,6 +2,7 @@
 
 #include "streamview/bitstream/h264_nal.hpp"
 #include "streamview/bitstream/h264_slice.hpp"
+#include "streamview/bitstream/h265_nal.hpp"
 #include "streamview/export/json_writer.hpp"
 
 namespace streamview::exporter {
@@ -9,6 +10,7 @@ namespace {
 
 void write_stream_summary_json(std::ostream& out, const analysis::StreamSummary& summary) {
     out << "  \"stream_summary\": {\n";
+    out << "    \"vps_count\": " << summary.vps_count << ",\n";
     out << "    \"sps_count\": " << summary.sps_count << ",\n";
     out << "    \"pps_count\": " << summary.pps_count << ",\n";
     out << "    \"slice_count\": " << summary.slices.total << ",\n";
@@ -116,6 +118,18 @@ void write_h264_details_json(std::ostream& out, const analysis::H264NalAnalysis&
     out << "      }\n";
 }
 
+void write_h265_details_json(std::ostream& out, const analysis::H265NalAnalysis& h265) {
+    out << "      \"h265\": {\n";
+    out << "        \"forbidden_zero_bit\": " << static_cast<int>(h265.header.forbidden_zero_bit) << ",\n";
+    out << "        \"nal_unit_type\": " << static_cast<int>(h265.header.nal_unit_type) << ",\n";
+    out << "        \"nal_unit_type_name\": ";
+    write_json_string(out, bitstream::h265_nal_type_name(h265.header.nal_unit_type));
+    out << ",\n";
+    out << "        \"nuh_layer_id\": " << static_cast<int>(h265.header.nuh_layer_id) << ",\n";
+    out << "        \"nuh_temporal_id_plus1\": " << static_cast<int>(h265.header.nuh_temporal_id_plus1) << "\n";
+    out << "      }\n";
+}
+
 } // namespace
 
 void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis) {
@@ -142,7 +156,11 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
         out << "      \"start_code_size\": " << nal.unit.start_code_size << ",\n";
         out << "      \"payload_offset\": " << nal.unit.payload_offset << ",\n";
         out << "      \"payload_size\": " << nal.unit.payload_size << ",\n";
-        write_h264_details_json(out, nal.h264);
+        if (nal.h264.has_value()) {
+            write_h264_details_json(out, *nal.h264);
+        } else if (nal.h265.has_value()) {
+            write_h265_details_json(out, *nal.h265);
+        }
         out << "    }" << (i + 1 == analysis.nals.size() ? "\n" : ",\n");
     }
 

@@ -107,7 +107,9 @@ int run_analyze(const AnalyzeOptions& options) {
         return 2;
     }
 
-    const auto analysis = streamview::analysis::analyze_h264_annex_b(options.input_path, *data);
+    const auto analysis = (has_extension(options.input_path, ".h265") || has_extension(options.input_path, ".265"))
+                              ? streamview::analysis::analyze_h265_annex_b(options.input_path, *data)
+                              : streamview::analysis::analyze_h264_annex_b(options.input_path, *data);
     return write_json_output(options, analysis);
 }
 
