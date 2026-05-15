@@ -41,6 +41,22 @@ set_tests_properties(streamview-cli-golden-h264-minimal
 )
 
 add_test(
+    NAME streamview-cli-summary-h264-minimal
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/h264_minimal_summary.txt
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_minimal_summary.actual.txt
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_summary_golden_test.cmake
+)
+
+set_tests_properties(streamview-cli-summary-h264-minimal
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
     NAME streamview-cli-golden-h265-minimal
     COMMAND
         ${CMAKE_COMMAND}
@@ -52,6 +68,22 @@ add_test(
 )
 
 set_tests_properties(streamview-cli-golden-h265-minimal
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-summary-h265-minimal
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h265/minimal_vps_sps_pps_idr.h265
+        -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/h265_minimal_summary.txt
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h265_minimal_summary.actual.txt
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_summary_golden_test.cmake
+)
+
+set_tests_properties(streamview-cli-summary-h265-minimal
     PROPERTIES
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )

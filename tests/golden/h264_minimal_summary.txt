@@ -1,0 +1,13 @@
+StreamView analysis summary
+Input: tests/samples/h264/minimal_sps_pps_idr.h264
+Format: annex_b
+Codec: h264
+Size bytes: 43
+NAL units: 3
+Frames: 1
+Keyframes: 1
+GOPs: 1
+Parameter sets: VPS=0, SPS=1, PPS=1
+Resolution: 640x360
+Profile/level: 100/31
+Slices: total=1, I=1, P=0, B=0, SP=0, SI=0

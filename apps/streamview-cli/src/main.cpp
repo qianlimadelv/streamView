@@ -85,6 +85,43 @@ std::optional<std::vector<std::uint8_t>> load_input_as_annex_b(const std::string
     return read_file(path);
 }
 
+void write_text_summary(std::ostream& out, const streamview::analysis::StreamAnalysis& analysis) {
+    out << "StreamView analysis summary\n";
+    out << "Input: " << analysis.input_path << "\n";
+    out << "Format: " << analysis.format << "\n";
+    out << "Codec: " << analysis.codec_guess << "\n";
+    out << "Size bytes: " << analysis.size_bytes << "\n";
+    out << "NAL units: " << analysis.nals.size() << "\n";
+    out << "Frames: " << analysis.summary.frame_count << "\n";
+    out << "Keyframes: " << analysis.summary.keyframe_count << "\n";
+    out << "GOPs: " << analysis.summary.gop_count << "\n";
+    out << "Parameter sets: VPS=" << analysis.summary.vps_count
+        << ", SPS=" << analysis.summary.sps_count
+        << ", PPS=" << analysis.summary.pps_count << "\n";
+
+    if (analysis.summary.active_sps.has_value()) {
+        out << "Resolution: " << analysis.summary.active_sps->width << "x" << analysis.summary.active_sps->height
+            << "\n";
+        out << "Profile/level: " << static_cast<int>(analysis.summary.active_sps->profile_idc)
+            << "/" << static_cast<int>(analysis.summary.active_sps->level_idc) << "\n";
+    } else if (analysis.summary.active_h265_sps.has_value()) {
+        out << "Resolution: " << analysis.summary.active_h265_sps->width << "x"
+            << analysis.summary.active_h265_sps->height << "\n";
+        out << "Profile/level: " << static_cast<int>(analysis.summary.active_h265_sps->profile_idc)
+            << "/" << static_cast<int>(analysis.summary.active_h265_sps->level_idc) << "\n";
+    } else {
+        out << "Resolution: unknown\n";
+        out << "Profile/level: unknown\n";
+    }
+
+    out << "Slices: total=" << analysis.summary.slices.total
+        << ", I=" << analysis.summary.slices.i
+        << ", P=" << analysis.summary.slices.p
+        << ", B=" << analysis.summary.slices.b
+        << ", SP=" << analysis.summary.slices.sp
+        << ", SI=" << analysis.summary.slices.si << "\n";
+}
+
 int write_json_output(const AnalyzeOptions& options, const streamview::analysis::StreamAnalysis& analysis) {
     if (options.json_output_path.has_value()) {
         std::ofstream output(*options.json_output_path, std::ios::binary);
@@ -96,7 +133,7 @@ int write_json_output(const AnalyzeOptions& options, const streamview::analysis:
         return 0;
     }
 
-    streamview::exporter::write_analysis_json(std::cout, analysis);
+    write_text_summary(std::cout, analysis);
     return 0;
 }
 
