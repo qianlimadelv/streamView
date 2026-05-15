@@ -24,6 +24,11 @@ struct AnalyzeOptions {
     std::optional<std::size_t> nal_limit;
 };
 
+struct ParseAnalyzeArgsResult {
+    std::optional<AnalyzeOptions> options;
+    std::string error;
+};
+
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
         << "  streamview analyze <input.h264> [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
@@ -51,9 +56,9 @@ std::optional<std::size_t> parse_size_arg(std::string_view value) {
     return parsed;
 }
 
-std::optional<AnalyzeOptions> parse_analyze_args(int argc, char** argv) {
+ParseAnalyzeArgsResult parse_analyze_args(int argc, char** argv) {
     if (argc < 3) {
-        return std::nullopt;
+        return {.error = "missing input path"};
     }
 
     AnalyzeOptions options{.input_path = argv[2]};
@@ -61,33 +66,33 @@ std::optional<AnalyzeOptions> parse_analyze_args(int argc, char** argv) {
         const std::string_view arg = argv[i];
         if (arg == "--json") {
             if (i + 1 >= argc) {
-                return std::nullopt;
+                return {.error = "--json requires an output path"};
             }
             options.json_output_path = argv[++i];
         } else if (arg == "--json-mode") {
             if (i + 1 >= argc) {
-                return std::nullopt;
+                return {.error = "--json-mode requires full or summary"};
             }
             const auto mode = parse_json_mode(argv[++i]);
             if (!mode.has_value()) {
-                return std::nullopt;
+                return {.error = "--json-mode must be full or summary"};
             }
             options.json_mode = *mode;
         } else if (arg == "--limit-nals") {
             if (i + 1 >= argc) {
-                return std::nullopt;
+                return {.error = "--limit-nals requires a non-negative integer"};
             }
             const auto limit = parse_size_arg(argv[++i]);
             if (!limit.has_value()) {
-                return std::nullopt;
+                return {.error = "--limit-nals requires a non-negative integer"};
             }
             options.nal_limit = *limit;
         } else {
-            return std::nullopt;
+            return {.error = "unknown analyze option: " + std::string(arg)};
         }
     }
 
-    return options;
+    return {.options = std::move(options)};
 }
 
 std::optional<std::vector<std::uint8_t>> read_file(const std::string& path) {
@@ -213,14 +218,16 @@ int main(int argc, char** argv) {
 
     const std::string_view command = argv[1];
     if (command == "analyze") {
-        const auto options = parse_analyze_args(argc, argv);
-        if (!options.has_value()) {
+        const auto result = parse_analyze_args(argc, argv);
+        if (!result.options.has_value()) {
+            std::cerr << "streamview: " << result.error << "\n";
             print_usage(std::cerr);
             return 1;
         }
-        return run_analyze(*options);
+        return run_analyze(*result.options);
     }
 
+    std::cerr << "streamview: unknown command: " << command << "\n";
     print_usage(std::cerr);
     return 1;
 }

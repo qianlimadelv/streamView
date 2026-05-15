@@ -25,6 +25,38 @@ target_compile_features(sv-analysis-tests PRIVATE cxx_std_20)
 add_test(NAME sv-analysis-tests COMMAND sv-analysis-tests)
 
 add_test(
+    NAME streamview-cli-invalid-json-mode
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_CASE=invalid-json-mode
+        -DSTREAMVIEW_EXPECTED_ERROR=--json-mode\ must\ be\ full\ or\ summary
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_invalid_args_test.cmake
+)
+
+set_tests_properties(streamview-cli-invalid-json-mode
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-invalid-limit-nals
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_CASE=invalid-limit-nals
+        -DSTREAMVIEW_EXPECTED_ERROR=--limit-nals\ requires\ a\ non-negative\ integer
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_invalid_args_test.cmake
+)
+
+set_tests_properties(streamview-cli-invalid-limit-nals
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
     NAME streamview-cli-golden-h264-minimal
     COMMAND
         ${CMAKE_COMMAND}
