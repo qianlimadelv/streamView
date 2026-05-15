@@ -41,6 +41,7 @@
 - VCL NAL 计数
 - 畸形参数集和 slice 输入测试
 - H.265 golden JSON 测试
+- 本地真实 H.264/H.265 码流 smoke test
 - 后续补 PPS 完整字段解析和 POC
 
 ## Phase 4：Container Input

@@ -32,6 +32,23 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+## Real Sample Tests
+
+If `/home/zhangyp/code/media` exists, CMake automatically enables local smoke
+tests for:
+
+- `video_264_hd.h264`
+- `video_265_sd.h265`
+
+For another local media directory:
+
+```bash
+cmake -S . -B build -DSTREAMVIEW_REAL_MEDIA_DIR=/path/to/media
+ctest --test-dir build --output-on-failure
+```
+
+These media files are not part of the repository.
+
 Optional FFmpeg demux support requires FFmpeg development packages
 (`libavformat`, `libavcodec`, `libavutil`) discoverable through `pkg-config`.
 If they are missing, the raw H.264 Annex B analyzer still builds.

@@ -55,3 +55,44 @@ set_tests_properties(streamview-cli-golden-h265-minimal
     PROPERTIES
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
+
+set(STREAMVIEW_REAL_MEDIA_DIR "" CACHE PATH "Optional local directory that contains real H.264/H.265 samples for smoke tests")
+if(NOT STREAMVIEW_REAL_MEDIA_DIR AND EXISTS "/home/zhangyp/code/media")
+    set(STREAMVIEW_REAL_MEDIA_DIR "/home/zhangyp/code/media")
+endif()
+
+if(STREAMVIEW_REAL_MEDIA_DIR)
+    set(STREAMVIEW_REAL_H264_SAMPLE "${STREAMVIEW_REAL_MEDIA_DIR}/video_264_hd.h264")
+    if(EXISTS "${STREAMVIEW_REAL_H264_SAMPLE}")
+        add_test(
+            NAME streamview-cli-real-h264-smoke
+            COMMAND
+                ${CMAKE_COMMAND}
+                -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+                -DSTREAMVIEW_SAMPLE=${STREAMVIEW_REAL_H264_SAMPLE}
+                -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/real_h264_smoke.actual.json
+                -DSTREAMVIEW_EXPECTED_CODEC=h264
+                -DSTREAMVIEW_MIN_NAL_COUNT=100
+                -DSTREAMVIEW_MIN_FRAME_COUNT=100
+                -DSTREAMVIEW_REQUIRED_JSON_FIELD=active_sps
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_smoke_test.cmake
+        )
+    endif()
+
+    set(STREAMVIEW_REAL_H265_SAMPLE "${STREAMVIEW_REAL_MEDIA_DIR}/video_265_sd.h265")
+    if(EXISTS "${STREAMVIEW_REAL_H265_SAMPLE}")
+        add_test(
+            NAME streamview-cli-real-h265-smoke
+            COMMAND
+                ${CMAKE_COMMAND}
+                -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+                -DSTREAMVIEW_SAMPLE=${STREAMVIEW_REAL_H265_SAMPLE}
+                -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/real_h265_smoke.actual.json
+                -DSTREAMVIEW_EXPECTED_CODEC=h265
+                -DSTREAMVIEW_MIN_NAL_COUNT=100
+                -DSTREAMVIEW_MIN_FRAME_COUNT=100
+                -DSTREAMVIEW_REQUIRED_JSON_FIELD=active_h265_sps
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_smoke_test.cmake
+        )
+    endif()
+endif()
