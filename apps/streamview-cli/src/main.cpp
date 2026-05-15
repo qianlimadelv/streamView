@@ -19,12 +19,23 @@ namespace {
 struct AnalyzeOptions {
     std::string input_path;
     std::optional<std::string> json_output_path;
+    streamview::exporter::AnalysisJsonMode json_mode{streamview::exporter::AnalysisJsonMode::Full};
 };
 
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
-        << "  streamview analyze <input.h264> [--json <output.json>]\n"
+        << "  streamview analyze <input.h264> [--json <output.json>] [--json-mode full|summary]\n"
         << "  streamview --help\n";
+}
+
+std::optional<streamview::exporter::AnalysisJsonMode> parse_json_mode(std::string_view value) {
+    if (value == "full") {
+        return streamview::exporter::AnalysisJsonMode::Full;
+    }
+    if (value == "summary") {
+        return streamview::exporter::AnalysisJsonMode::Summary;
+    }
+    return std::nullopt;
 }
 
 std::optional<AnalyzeOptions> parse_analyze_args(int argc, char** argv) {
@@ -40,6 +51,15 @@ std::optional<AnalyzeOptions> parse_analyze_args(int argc, char** argv) {
                 return std::nullopt;
             }
             options.json_output_path = argv[++i];
+        } else if (arg == "--json-mode") {
+            if (i + 1 >= argc) {
+                return std::nullopt;
+            }
+            const auto mode = parse_json_mode(argv[++i]);
+            if (!mode.has_value()) {
+                return std::nullopt;
+            }
+            options.json_mode = *mode;
         } else {
             return std::nullopt;
         }
@@ -134,7 +154,7 @@ int write_json_output(const AnalyzeOptions& options, const streamview::analysis:
             std::cerr << "streamview: failed to open JSON output file: " << *options.json_output_path << "\n";
             return 2;
         }
-        streamview::exporter::write_analysis_json(output, analysis);
+        streamview::exporter::write_analysis_json(output, analysis, options.json_mode);
         return 0;
     }
 

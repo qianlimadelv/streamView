@@ -308,7 +308,7 @@ void write_gops_json(std::ostream& out, const std::vector<analysis::GopAnalysis>
 
 } // namespace
 
-void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis) {
+void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis, AnalysisJsonMode mode) {
     out << "{\n";
     out << "  \"format\": ";
     write_json_string(out, analysis.format);
@@ -322,6 +322,14 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
     out << "  \"size_bytes\": " << analysis.size_bytes << ",\n";
     out << "  \"nal_count\": " << analysis.nals.size() << ",\n";
     write_stream_summary_json(out, analysis.summary);
+    if (mode == AnalysisJsonMode::Summary) {
+        out << "  \"frames_omitted\": " << analysis.frames.size() << ",\n";
+        out << "  \"gops_omitted\": " << analysis.gops.size() << ",\n";
+        out << "  \"nals_omitted\": " << analysis.nals.size() << "\n";
+        out << "}\n";
+        return;
+    }
+
     write_frames_json(out, analysis.frames);
     write_gops_json(out, analysis.gops);
     out << "  \"nals\": [\n";
@@ -344,6 +352,10 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
 
     out << "  ]\n";
     out << "}\n";
+}
+
+void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis) {
+    write_analysis_json(out, analysis, AnalysisJsonMode::Full);
 }
 
 } // namespace streamview::exporter

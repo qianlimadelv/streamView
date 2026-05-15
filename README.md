@@ -64,8 +64,10 @@ sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
 ```bash
 ./build/apps/streamview-cli/streamview analyze samples/example.h264
 ./build/apps/streamview-cli/streamview analyze samples/example.h264 --json out.json
+./build/apps/streamview-cli/streamview analyze samples/example.h264 --json summary.json --json-mode summary
 ```
 
 Without `--json`, the CLI prints a concise text summary, including parse error
 counts. With `--json`, it writes the full NAL/frame/GOP analysis model to the
-selected file.
+selected file. Use `--json-mode summary` for large streams when only the top
+level summary is needed.
