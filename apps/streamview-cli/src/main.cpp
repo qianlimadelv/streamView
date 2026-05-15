@@ -1,11 +1,14 @@
 #include "streamview/analysis/stream_analysis.hpp"
+#include "streamview/bitstream/rbsp.hpp"
 #include "streamview/export/analysis_json_writer.hpp"
 #include "streamview/export/json_writer.hpp"
 #if defined(STREAMVIEW_HAS_FFMPEG_DEMUX)
 #include "streamview/demux/ffmpeg_h264_demuxer.hpp"
 #endif
 
+#include <algorithm>
 #include <cstdint>
+#include <iomanip>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -27,6 +30,12 @@ enum class CodecOverride {
     Auto,
     H264,
     H265,
+};
+
+enum class DumpFormat {
+    Hex,
+    Payload,
+    Rbsp,
 };
 
 struct AnalyzeOptions {
@@ -65,12 +74,25 @@ struct ParseErrorsArgsResult {
     std::string error;
 };
 
+struct DumpOptions {
+    std::string input_path;
+    std::size_t nal_index{};
+    DumpFormat format{DumpFormat::Hex};
+    std::optional<std::string> output_path;
+};
+
+struct ParseDumpArgsResult {
+    std::optional<DumpOptions> options;
+    std::string error;
+};
+
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
         << "  streamview analyze <input> [--format text|json] [--output <path|->] [--codec auto|h264|h265]\n"
         << "                    [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
         << "  streamview inspect <input.h264> --nal <index>|--frame <index>|--gop <index>\n"
         << "  streamview errors <input.h264> [--json]\n"
+        << "  streamview dump <input.h264> --nal <index> [--format hex|payload|rbsp] [--output <path|->]\n"
         << "  streamview --help\n";
 }
 
@@ -103,6 +125,19 @@ std::optional<CodecOverride> parse_codec_override(std::string_view value) {
     }
     if (value == "h265") {
         return CodecOverride::H265;
+    }
+    return std::nullopt;
+}
+
+std::optional<DumpFormat> parse_dump_format(std::string_view value) {
+    if (value == "hex") {
+        return DumpFormat::Hex;
+    }
+    if (value == "payload") {
+        return DumpFormat::Payload;
+    }
+    if (value == "rbsp") {
+        return DumpFormat::Rbsp;
     }
     return std::nullopt;
 }
@@ -244,6 +279,50 @@ ParseErrorsArgsResult parse_errors_args(int argc, char** argv) {
         } else {
             return {.error = "unknown errors option: " + std::string(arg)};
         }
+    }
+    return {.options = std::move(options)};
+}
+
+ParseDumpArgsResult parse_dump_args(int argc, char** argv) {
+    if (argc < 5) {
+        return {.error = "dump requires an input path and --nal"};
+    }
+
+    DumpOptions options{.input_path = argv[2]};
+    bool has_nal = false;
+    for (int i = 3; i < argc; ++i) {
+        const std::string_view arg = argv[i];
+        if (arg == "--nal") {
+            if (i + 1 >= argc) {
+                return {.error = "--nal requires a non-negative integer"};
+            }
+            const auto index = parse_size_arg(argv[++i]);
+            if (!index.has_value()) {
+                return {.error = "--nal requires a non-negative integer"};
+            }
+            options.nal_index = *index;
+            has_nal = true;
+        } else if (arg == "--format") {
+            if (i + 1 >= argc) {
+                return {.error = "--format requires hex, payload, or rbsp"};
+            }
+            const auto format = parse_dump_format(argv[++i]);
+            if (!format.has_value()) {
+                return {.error = "--format must be hex, payload, or rbsp"};
+            }
+            options.format = *format;
+        } else if (arg == "--output") {
+            if (i + 1 >= argc) {
+                return {.error = "--output requires a path or -"};
+            }
+            options.output_path = argv[++i];
+        } else {
+            return {.error = "unknown dump option: " + std::string(arg)};
+        }
+    }
+
+    if (!has_nal) {
+        return {.error = "dump requires --nal"};
     }
     return {.options = std::move(options)};
 }
@@ -711,6 +790,82 @@ int run_errors(const ErrorsOptions& options) {
     return analysis->summary.parse_errors.total == 0 ? 0 : 3;
 }
 
+void write_hex_dump(std::ostream& out, std::span<const std::uint8_t> bytes) {
+    constexpr std::size_t bytes_per_line = 16;
+    const auto old_flags = out.flags();
+    const auto old_fill = out.fill();
+
+    for (std::size_t offset = 0; offset < bytes.size(); offset += bytes_per_line) {
+        out << std::hex << std::setw(8) << std::setfill('0') << offset << "  ";
+        const auto line_size = std::min(bytes_per_line, bytes.size() - offset);
+        for (std::size_t i = 0; i < bytes_per_line; ++i) {
+            if (i < line_size) {
+                out << std::setw(2) << static_cast<int>(bytes[offset + i]);
+            } else {
+                out << "  ";
+            }
+            out << (i == 7 ? "  " : " ");
+        }
+        out << " |";
+        for (std::size_t i = 0; i < line_size; ++i) {
+            const auto byte = bytes[offset + i];
+            out << (byte >= 0x20 && byte <= 0x7e ? static_cast<char>(byte) : '.');
+        }
+        out << "|\n";
+    }
+
+    out.flags(old_flags);
+    out.fill(old_fill);
+}
+
+int write_dump_output(const DumpOptions& options, std::span<const std::uint8_t> bytes) {
+    std::ofstream file_output;
+    std::ostream* output = &std::cout;
+    if (options.output_path.has_value() && *options.output_path != "-") {
+        file_output.open(*options.output_path, std::ios::binary);
+        output = &file_output;
+        if (!file_output) {
+            std::cerr << "streamview: failed to open output file: " << *options.output_path << "\n";
+            return 2;
+        }
+    }
+
+    if (options.format == DumpFormat::Hex) {
+        write_hex_dump(*output, bytes);
+    } else {
+        output->write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        if (!*output) {
+            std::cerr << "streamview: failed to write dump output\n";
+            return 2;
+        }
+    }
+    return 0;
+}
+
+int run_dump(const DumpOptions& options) {
+    const auto data = load_input_as_annex_b(options.input_path);
+    if (!data.has_value()) {
+        std::cerr << "streamview: failed to read input file: " << options.input_path << "\n";
+        return 2;
+    }
+
+    const auto nals = streamview::bitstream::scan_annex_b(*data);
+    if (options.nal_index >= nals.size()) {
+        std::cerr << "streamview: NAL index out of range: " << options.nal_index
+                  << " >= " << nals.size() << "\n";
+        return 2;
+    }
+
+    const auto& nal = nals[options.nal_index];
+    const auto payload = std::span<const std::uint8_t>(*data).subspan(nal.payload_offset, nal.payload_size);
+    if (options.format == DumpFormat::Rbsp) {
+        const auto rbsp = streamview::bitstream::nal_payload_to_rbsp(payload);
+        return write_dump_output(options, rbsp);
+    }
+
+    return write_dump_output(options, payload);
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -746,6 +901,15 @@ int main(int argc, char** argv) {
             return 1;
         }
         return run_errors(*result.options);
+    }
+    if (command == "dump") {
+        const auto result = parse_dump_args(argc, argv);
+        if (!result.options.has_value()) {
+            std::cerr << "streamview: " << result.error << "\n";
+            print_usage(std::cerr);
+            return 1;
+        }
+        return run_dump(*result.options);
     }
 
     std::cerr << "streamview: unknown command: " << command << "\n";

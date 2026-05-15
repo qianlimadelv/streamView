@@ -10,6 +10,7 @@ streamview analyze <input> [--format text|json] [--output <path|->] [--codec aut
                    [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]
 streamview inspect <input> --nal <index>|--frame <index>|--gop <index>
 streamview errors <input> [--json]
+streamview dump <input> --nal <index> [--format hex|payload|rbsp] [--output <path|->]
 ```
 
 ## Analyze
@@ -32,6 +33,15 @@ inspect 会输出所属 GOP 索引。
 
 `errors` 只输出 parser 失败项，适合快速判断真实码流是否存在当前解析器能识别
 的问题。脚本场景建议使用 `--json`。
+
+## Dump
+
+`dump` 用于从 Annex B 码流中导出单个 NAL：
+
+- `--format hex`: 人可读的十六进制视图，默认格式。
+- `--format payload`: 原始 NAL payload 字节，不包含 Annex B start code。
+- `--format rbsp`: 移除 emulation-prevention byte 之后的 RBSP 字节。
+- `--output <path|->`: 写入文件，或用 `-` 输出到 stdout。
 
 ## 退出码
 

@@ -39,6 +39,13 @@ elseif(STREAMVIEW_CASE STREQUAL "invalid-codec")
         OUTPUT_VARIABLE stdout
         ERROR_VARIABLE stderr
     )
+elseif(STREAMVIEW_CASE STREQUAL "invalid-dump-format")
+    execute_process(
+        COMMAND ${STREAMVIEW_CLI} dump ${STREAMVIEW_SAMPLE} --nal 0 --format text
+        RESULT_VARIABLE result
+        OUTPUT_VARIABLE stdout
+        ERROR_VARIABLE stderr
+    )
 else()
     message(FATAL_ERROR "Unknown invalid args test case: ${STREAMVIEW_CASE}")
 endif()

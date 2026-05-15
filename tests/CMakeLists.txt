@@ -89,6 +89,22 @@ set_tests_properties(streamview-cli-invalid-codec
 )
 
 add_test(
+    NAME streamview-cli-invalid-dump-format
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_CASE=invalid-dump-format
+        -DSTREAMVIEW_EXPECTED_ERROR=--format\ must\ be\ hex,\ payload,\ or\ rbsp
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_invalid_args_test.cmake
+)
+
+set_tests_properties(streamview-cli-invalid-dump-format
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
     NAME streamview-cli-golden-h264-minimal
     COMMAND
         ${CMAKE_COMMAND}
@@ -187,6 +203,42 @@ add_test(
 )
 
 set_tests_properties(streamview-cli-inspect-h264-gop
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-dump-h264-sps-hex
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_NAL_INDEX=0
+        -DSTREAMVIEW_DUMP_FORMAT=hex
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_dump_sps.actual.hex
+        -DSTREAMVIEW_EXPECTED_HEX=67
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_dump_test.cmake
+)
+
+set_tests_properties(streamview-cli-dump-h264-sps-hex
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-dump-h264-sps-payload
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_NAL_INDEX=0
+        -DSTREAMVIEW_DUMP_FORMAT=payload
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_dump_sps.actual.bin
+        -DSTREAMVIEW_EXPECTED_MIN_SIZE=4
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_dump_test.cmake
+)
+
+set_tests_properties(streamview-cli-dump-h264-sps-payload
     PROPERTIES
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )

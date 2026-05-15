@@ -11,6 +11,7 @@ streamview analyze <input> [--format text|json] [--output <path|->] [--codec aut
                    [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]
 streamview inspect <input> --nal <index>|--frame <index>|--gop <index>
 streamview errors <input> [--json]
+streamview dump <input> --nal <index> [--format hex|payload|rbsp] [--output <path|->]
 ```
 
 ## Analyze
@@ -34,6 +35,15 @@ that reference the NAL. Frame inspect includes the owning GOP index when known.
 
 `errors` prints only parser failures and is intended for quick stream triage.
 Use `--json` when scripting.
+
+## Dump
+
+`dump` exports one NAL from the Annex B stream:
+
+- `--format hex`: human-readable hex view; this is the default.
+- `--format payload`: raw NAL payload bytes, excluding the Annex B start code.
+- `--format rbsp`: NAL payload after emulation-prevention byte removal.
+- `--output <path|->`: write to a file, or use `-` for stdout.
 
 ## Exit Codes
 

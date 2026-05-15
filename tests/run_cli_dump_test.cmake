@@ -1,0 +1,48 @@
+if(NOT DEFINED STREAMVIEW_CLI)
+    message(FATAL_ERROR "STREAMVIEW_CLI is required")
+endif()
+if(NOT DEFINED STREAMVIEW_SAMPLE)
+    message(FATAL_ERROR "STREAMVIEW_SAMPLE is required")
+endif()
+if(NOT DEFINED STREAMVIEW_OUTPUT)
+    message(FATAL_ERROR "STREAMVIEW_OUTPUT is required")
+endif()
+
+if(NOT DEFINED STREAMVIEW_NAL_INDEX)
+    set(STREAMVIEW_NAL_INDEX 0)
+endif()
+if(NOT DEFINED STREAMVIEW_DUMP_FORMAT)
+    set(STREAMVIEW_DUMP_FORMAT hex)
+endif()
+
+execute_process(
+    COMMAND ${STREAMVIEW_CLI} dump ${STREAMVIEW_SAMPLE} --nal ${STREAMVIEW_NAL_INDEX} --format ${STREAMVIEW_DUMP_FORMAT} --output ${STREAMVIEW_OUTPUT}
+    RESULT_VARIABLE result
+    ERROR_VARIABLE stderr
+)
+
+if(NOT result EQUAL 0)
+    message(FATAL_ERROR "streamview dump failed: ${stderr}")
+endif()
+
+if(STREAMVIEW_DUMP_FORMAT STREQUAL "hex")
+    file(READ ${STREAMVIEW_OUTPUT} output_text)
+    string(FIND "${output_text}" "00000000" offset_position)
+    if(offset_position EQUAL -1)
+        message(FATAL_ERROR "Expected hex dump offset in ${STREAMVIEW_OUTPUT}")
+    endif()
+    if(DEFINED STREAMVIEW_EXPECTED_HEX)
+        string(FIND "${output_text}" "${STREAMVIEW_EXPECTED_HEX}" hex_position)
+        if(hex_position EQUAL -1)
+            message(FATAL_ERROR "Expected hex bytes ${STREAMVIEW_EXPECTED_HEX} in ${STREAMVIEW_OUTPUT}")
+        endif()
+    endif()
+else()
+    file(SIZE ${STREAMVIEW_OUTPUT} output_size)
+    if(NOT DEFINED STREAMVIEW_EXPECTED_MIN_SIZE)
+        set(STREAMVIEW_EXPECTED_MIN_SIZE 1)
+    endif()
+    if(output_size LESS STREAMVIEW_EXPECTED_MIN_SIZE)
+        message(FATAL_ERROR "Expected dump output size >= ${STREAMVIEW_EXPECTED_MIN_SIZE}, got ${output_size}")
+    endif()
+endif()
