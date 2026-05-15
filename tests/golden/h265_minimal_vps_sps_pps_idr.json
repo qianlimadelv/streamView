@@ -13,7 +13,7 @@
     "gop_count": 1,
     "slice_count": 1,
     "slice_types": {
-      "I": 0,
+      "I": 1,
       "P": 0,
       "B": 0,
       "SP": 0,
@@ -33,7 +33,7 @@
     {
       "index": 0,
       "codec": "h265",
-      "frame_type": "IDR",
+      "frame_type": "I",
       "is_keyframe": true,
       "size_bytes": 6,
       "first_payload_offset": 40,
@@ -105,7 +105,14 @@
         "nal_unit_type": 34,
         "nal_unit_type_name": "pps",
         "nuh_layer_id": 0,
-        "nuh_temporal_id_plus1": 1
+        "nuh_temporal_id_plus1": 1,
+        "pps": {
+          "pic_parameter_set_id": 0,
+          "seq_parameter_set_id": 0,
+          "dependent_slice_segments_enabled_flag": false,
+          "output_flag_present_flag": false,
+          "num_extra_slice_header_bits": 0
+        }
       }
     },
     {
@@ -124,7 +131,9 @@
           "first_slice_segment_in_pic_flag": true,
           "no_output_of_prior_pics_flag_present": true,
           "no_output_of_prior_pics_flag": false,
-          "slice_pic_parameter_set_id": 0
+          "slice_pic_parameter_set_id": 0,
+          "slice_type_raw": 2,
+          "slice_type": "I"
         }
       }
     }

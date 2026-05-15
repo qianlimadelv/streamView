@@ -35,15 +35,17 @@
 - H.265 NAL header 解析
 - VPS/SPS/PPS 识别
 - H.265 SPS 基础字段
+- H.265 PPS 基础字段
 - H.265 宽高推导
 - H.265 slice header 前缀字段
+- H.265 slice_type 基础解析
 - VCL NAL 计数
 - CLI golden JSON 测试
 
 尚未支持：
 
-- H.265 VPS/PPS 字段解析
-- H.265 slice_type 解析
+- H.265 VPS 字段解析
+- H.265 PPS 完整字段解析
 - H.265 POC 推导
 
 ## Parser 标准说明

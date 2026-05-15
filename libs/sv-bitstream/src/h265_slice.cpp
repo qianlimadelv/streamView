@@ -11,11 +11,25 @@ namespace {
     return value >= 16 && value <= 23;
 }
 
+[[nodiscard]] std::optional<H265SliceKind> to_slice_kind(std::uint32_t slice_type_raw) {
+    switch (slice_type_raw) {
+    case 0:
+        return H265SliceKind::B;
+    case 1:
+        return H265SliceKind::P;
+    case 2:
+        return H265SliceKind::I;
+    default:
+        return std::nullopt;
+    }
+}
+
 } // namespace
 
 H265SliceHeaderParseResult parse_h265_slice_header(
     std::span<const std::uint8_t> nal_payload,
-    H265NalType nal_unit_type) {
+    H265NalType nal_unit_type,
+    std::optional<std::uint8_t> num_extra_slice_header_bits) {
     if (nal_payload.size() < 3) {
         return {Status::parse_error("H.265 slice NAL payload is too small"), std::nullopt};
     }
@@ -45,7 +59,37 @@ H265SliceHeaderParseResult parse_h265_slice_header(
     }
     info.slice_pic_parameter_set_id = *slice_pic_parameter_set_id;
 
+    if (info.first_slice_segment_in_pic_flag && num_extra_slice_header_bits.has_value()) {
+        if (!reader.read_bits(*num_extra_slice_header_bits).has_value()) {
+            return {Status::parse_error("failed to read H.265 extra slice header bits"), std::nullopt};
+        }
+
+        const auto slice_type_raw = reader.read_ue();
+        if (!slice_type_raw.has_value()) {
+            return {Status::parse_error("failed to read H.265 slice_type"), std::nullopt};
+        }
+        const auto slice_kind = to_slice_kind(*slice_type_raw);
+        if (!slice_kind.has_value()) {
+            return {Status::parse_error("invalid H.265 slice_type"), std::nullopt};
+        }
+        info.slice_type_present = true;
+        info.slice_type_raw = *slice_type_raw;
+        info.slice_kind = *slice_kind;
+    }
+
     return {Status::ok(), info};
+}
+
+std::string_view h265_slice_kind_name(H265SliceKind kind) {
+    switch (kind) {
+    case H265SliceKind::B:
+        return "B";
+    case H265SliceKind::P:
+        return "P";
+    case H265SliceKind::I:
+        return "I";
+    }
+    return "unknown";
 }
 
 } // namespace streamview::bitstream

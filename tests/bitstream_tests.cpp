@@ -5,6 +5,7 @@
 #include "streamview/bitstream/h264_slice.hpp"
 #include "streamview/bitstream/h264_sps.hpp"
 #include "streamview/bitstream/h265_nal.hpp"
+#include "streamview/bitstream/h265_pps.hpp"
 #include "streamview/bitstream/h265_slice.hpp"
 #include "streamview/bitstream/h265_sps.hpp"
 #include "streamview/bitstream/rbsp.hpp"
@@ -271,11 +272,12 @@ void test_parses_h265_sps_dimensions() {
 }
 
 void test_parses_h265_slice_header_prefix() {
-    const std::vector<std::uint8_t> slice{0x26, 0x01, 0xb0};
+    const std::vector<std::uint8_t> slice{0x26, 0x01, 0xae};
 
     const auto result = streamview::bitstream::parse_h265_slice_header(
         slice,
-        streamview::bitstream::H265NalType::IdrWRadl);
+        streamview::bitstream::H265NalType::IdrWRadl,
+        0);
 
     require(result.status.is_ok(), "H.265 slice parse status");
     require(result.info.has_value(), "H.265 slice info present");
@@ -283,6 +285,24 @@ void test_parses_h265_slice_header_prefix() {
     require(result.info->no_output_of_prior_pics_flag_present, "H.265 no output present");
     require(!result.info->no_output_of_prior_pics_flag, "H.265 no output flag");
     require(result.info->slice_pic_parameter_set_id == 0, "H.265 slice PPS id");
+    require(result.info->slice_type_present, "H.265 slice type present");
+    require(result.info->slice_type_raw == 2, "H.265 slice type raw");
+    require(result.info->slice_kind == streamview::bitstream::H265SliceKind::I, "H.265 slice kind");
+    require(streamview::bitstream::h265_slice_kind_name(result.info->slice_kind) == "I", "H.265 slice kind name");
+}
+
+void test_parses_h265_pps_baseline_fields() {
+    const std::vector<std::uint8_t> pps{0x44, 0x01, 0xc0};
+
+    const auto result = streamview::bitstream::parse_h265_pps(pps);
+
+    require(result.status.is_ok(), "H.265 PPS parse status");
+    require(result.info.has_value(), "H.265 PPS info present");
+    require(result.info->pic_parameter_set_id == 0, "H.265 PPS id");
+    require(result.info->seq_parameter_set_id == 0, "H.265 PPS SPS id");
+    require(!result.info->dependent_slice_segments_enabled_flag, "H.265 PPS dependent slices flag");
+    require(!result.info->output_flag_present_flag, "H.265 PPS output flag present");
+    require(result.info->num_extra_slice_header_bits == 0, "H.265 PPS extra header bits");
 }
 
 } // namespace
@@ -300,6 +320,7 @@ int main() {
     test_parses_h264_slice_header_prefix();
     test_parses_h265_nal_header();
     test_parses_h265_sps_dimensions();
+    test_parses_h265_pps_baseline_fields();
     test_parses_h265_slice_header_prefix();
     return 0;
 }
