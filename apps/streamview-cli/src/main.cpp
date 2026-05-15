@@ -32,7 +32,9 @@ struct ParseAnalyzeArgsResult {
 
 struct InspectOptions {
     std::string input_path;
-    std::size_t nal_index{};
+    std::optional<std::size_t> nal_index;
+    std::optional<std::size_t> frame_index;
+    std::optional<std::size_t> gop_index;
 };
 
 struct ParseInspectArgsResult {
@@ -43,7 +45,7 @@ struct ParseInspectArgsResult {
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
         << "  streamview analyze <input.h264> [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
-        << "  streamview inspect <input.h264> --nal <index>\n"
+        << "  streamview inspect <input.h264> --nal <index>|--frame <index>|--gop <index>\n"
         << "  streamview --help\n";
 }
 
@@ -109,11 +111,11 @@ ParseAnalyzeArgsResult parse_analyze_args(int argc, char** argv) {
 
 ParseInspectArgsResult parse_inspect_args(int argc, char** argv) {
     if (argc < 5) {
-        return {.error = "inspect requires an input path and --nal <index>"};
+        return {.error = "inspect requires an input path and one selector"};
     }
 
     InspectOptions options{.input_path = argv[2]};
-    bool has_nal_index = false;
+    int selector_count = 0;
     for (int i = 3; i < argc; ++i) {
         const std::string_view arg = argv[i];
         if (arg == "--nal") {
@@ -124,15 +126,35 @@ ParseInspectArgsResult parse_inspect_args(int argc, char** argv) {
             if (!index.has_value()) {
                 return {.error = "--nal requires a non-negative integer"};
             }
-            options.nal_index = *index;
-            has_nal_index = true;
+            options.nal_index = index;
+            ++selector_count;
+        } else if (arg == "--frame") {
+            if (i + 1 >= argc) {
+                return {.error = "--frame requires a non-negative integer"};
+            }
+            const auto index = parse_size_arg(argv[++i]);
+            if (!index.has_value()) {
+                return {.error = "--frame requires a non-negative integer"};
+            }
+            options.frame_index = index;
+            ++selector_count;
+        } else if (arg == "--gop") {
+            if (i + 1 >= argc) {
+                return {.error = "--gop requires a non-negative integer"};
+            }
+            const auto index = parse_size_arg(argv[++i]);
+            if (!index.has_value()) {
+                return {.error = "--gop requires a non-negative integer"};
+            }
+            options.gop_index = index;
+            ++selector_count;
         } else {
             return {.error = "unknown inspect option: " + std::string(arg)};
         }
     }
 
-    if (!has_nal_index) {
-        return {.error = "inspect requires --nal <index>"};
+    if (selector_count != 1) {
+        return {.error = "inspect requires exactly one selector: --nal, --frame, or --gop"};
     }
     return {.options = std::move(options)};
 }
@@ -325,19 +347,96 @@ void write_nal_inspect_json(std::ostream& out,
     out << "}\n";
 }
 
+void write_frame_inspect_json(std::ostream& out,
+                              const streamview::analysis::StreamAnalysis& analysis,
+                              std::size_t frame_index) {
+    const auto& frame = analysis.frames[frame_index];
+    out << "{\n";
+    out << "  \"input\": ";
+    streamview::exporter::write_json_string(out, analysis.input_path);
+    out << ",\n";
+    out << "  \"codec_guess\": ";
+    streamview::exporter::write_json_string(out, analysis.codec_guess);
+    out << ",\n";
+    out << "  \"frame_count\": " << analysis.frames.size() << ",\n";
+    out << "  \"frame\": {\n";
+    out << "    \"index\": " << frame.index << ",\n";
+    out << "    \"codec\": ";
+    streamview::exporter::write_json_string(out, frame.codec);
+    out << ",\n";
+    out << "    \"frame_type\": ";
+    streamview::exporter::write_json_string(out, frame.frame_type);
+    out << ",\n";
+    out << "    \"is_keyframe\": " << (frame.is_keyframe ? "true" : "false") << ",\n";
+    out << "    \"size_bytes\": " << frame.size_bytes << ",\n";
+    out << "    \"first_payload_offset\": " << frame.first_payload_offset << ",\n";
+    out << "    \"nal_indices\": [";
+    for (std::size_t i = 0; i < frame.nal_indices.size(); ++i) {
+        out << frame.nal_indices[i] << (i + 1 == frame.nal_indices.size() ? "" : ", ");
+    }
+    out << "]\n";
+    out << "  }\n";
+    out << "}\n";
+}
+
+void write_gop_inspect_json(std::ostream& out,
+                            const streamview::analysis::StreamAnalysis& analysis,
+                            std::size_t gop_index) {
+    const auto& gop = analysis.gops[gop_index];
+    out << "{\n";
+    out << "  \"input\": ";
+    streamview::exporter::write_json_string(out, analysis.input_path);
+    out << ",\n";
+    out << "  \"codec_guess\": ";
+    streamview::exporter::write_json_string(out, analysis.codec_guess);
+    out << ",\n";
+    out << "  \"gop_count\": " << analysis.gops.size() << ",\n";
+    out << "  \"gop\": {\n";
+    out << "    \"index\": " << gop.index << ",\n";
+    out << "    \"start_frame_index\": " << gop.start_frame_index << ",\n";
+    out << "    \"end_frame_index\": " << gop.end_frame_index << ",\n";
+    out << "    \"frame_count\": " << gop.frame_count << ",\n";
+    out << "    \"keyframe_index\": " << gop.keyframe_index << ",\n";
+    out << "    \"size_bytes\": " << gop.size_bytes << ",\n";
+    out << "    \"starts_with_keyframe\": " << (gop.starts_with_keyframe ? "true" : "false") << "\n";
+    out << "  }\n";
+    out << "}\n";
+}
+
 int run_inspect(const InspectOptions& options) {
     const auto analysis = analyze_input(options.input_path);
     if (!analysis.has_value()) {
         return 2;
     }
-    if (options.nal_index >= analysis->nals.size()) {
-        std::cerr << "streamview: NAL index out of range: " << options.nal_index
-                  << " >= " << analysis->nals.size() << "\n";
-        return 2;
+    if (options.nal_index.has_value()) {
+        if (*options.nal_index >= analysis->nals.size()) {
+            std::cerr << "streamview: NAL index out of range: " << *options.nal_index
+                      << " >= " << analysis->nals.size() << "\n";
+            return 2;
+        }
+        write_nal_inspect_json(std::cout, *analysis, *options.nal_index);
+        return 0;
     }
-
-    write_nal_inspect_json(std::cout, *analysis, options.nal_index);
-    return 0;
+    if (options.frame_index.has_value()) {
+        if (*options.frame_index >= analysis->frames.size()) {
+            std::cerr << "streamview: frame index out of range: " << *options.frame_index
+                      << " >= " << analysis->frames.size() << "\n";
+            return 2;
+        }
+        write_frame_inspect_json(std::cout, *analysis, *options.frame_index);
+        return 0;
+    }
+    if (options.gop_index.has_value()) {
+        if (*options.gop_index >= analysis->gops.size()) {
+            std::cerr << "streamview: GOP index out of range: " << *options.gop_index
+                      << " >= " << analysis->gops.size() << "\n";
+            return 2;
+        }
+        write_gop_inspect_json(std::cout, *analysis, *options.gop_index);
+        return 0;
+    }
+    std::cerr << "streamview: inspect requires a selector\n";
+    return 1;
 }
 
 } // namespace

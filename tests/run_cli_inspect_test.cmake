@@ -14,8 +14,22 @@ if(NOT DEFINED STREAMVIEW_REQUIRED_FIELD)
     message(FATAL_ERROR "STREAMVIEW_REQUIRED_FIELD is required")
 endif()
 
+if(NOT DEFINED STREAMVIEW_INSPECT_KIND)
+    set(STREAMVIEW_INSPECT_KIND nal)
+endif()
+
+if(STREAMVIEW_INSPECT_KIND STREQUAL "nal")
+    set(selector --nal)
+elseif(STREAMVIEW_INSPECT_KIND STREQUAL "frame")
+    set(selector --frame)
+elseif(STREAMVIEW_INSPECT_KIND STREQUAL "gop")
+    set(selector --gop)
+else()
+    message(FATAL_ERROR "Unknown inspect kind: ${STREAMVIEW_INSPECT_KIND}")
+endif()
+
 execute_process(
-    COMMAND ${STREAMVIEW_CLI} inspect ${STREAMVIEW_SAMPLE} --nal ${STREAMVIEW_NAL_INDEX}
+    COMMAND ${STREAMVIEW_CLI} inspect ${STREAMVIEW_SAMPLE} ${selector} ${STREAMVIEW_NAL_INDEX}
     RESULT_VARIABLE result
     OUTPUT_FILE ${STREAMVIEW_OUTPUT}
     ERROR_VARIABLE stderr

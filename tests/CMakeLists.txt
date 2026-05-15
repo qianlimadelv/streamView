@@ -124,6 +124,42 @@ set_tests_properties(streamview-cli-inspect-h264-sps
 )
 
 add_test(
+    NAME streamview-cli-inspect-h264-frame
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_NAL_INDEX=0
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_inspect_frame.actual.json
+        -DSTREAMVIEW_REQUIRED_FIELD=frame_type
+        -DSTREAMVIEW_INSPECT_KIND=frame
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_inspect_test.cmake
+)
+
+set_tests_properties(streamview-cli-inspect-h264-frame
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-inspect-h264-gop
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_NAL_INDEX=0
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_inspect_gop.actual.json
+        -DSTREAMVIEW_REQUIRED_FIELD=start_frame_index
+        -DSTREAMVIEW_INSPECT_KIND=gop
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_inspect_test.cmake
+)
+
+set_tests_properties(streamview-cli-inspect-h264-gop
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
     NAME streamview-cli-summary-h264-minimal
     COMMAND
         ${CMAKE_COMMAND}
