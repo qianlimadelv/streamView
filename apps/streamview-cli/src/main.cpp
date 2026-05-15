@@ -74,6 +74,22 @@ struct ParseErrorsArgsResult {
     std::string error;
 };
 
+struct ValidateOptions {
+    std::string input_path;
+    bool json_output{};
+};
+
+struct ParseValidateArgsResult {
+    std::optional<ValidateOptions> options;
+    std::string error;
+};
+
+struct ValidationIssue {
+    std::string severity;
+    std::string code;
+    std::string message;
+};
+
 struct DumpOptions {
     std::string input_path;
     std::size_t nal_index{};
@@ -92,6 +108,7 @@ void print_usage(std::ostream& out) {
         << "                    [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
         << "  streamview inspect <input.h264> --nal <index>|--frame <index>|--gop <index>\n"
         << "  streamview errors <input.h264> [--json]\n"
+        << "  streamview validate <input.h264> [--json]\n"
         << "  streamview dump <input.h264> --nal <index> [--format hex|payload|rbsp] [--output <path|->]\n"
         << "  streamview --help\n";
 }
@@ -278,6 +295,23 @@ ParseErrorsArgsResult parse_errors_args(int argc, char** argv) {
             options.json_output = true;
         } else {
             return {.error = "unknown errors option: " + std::string(arg)};
+        }
+    }
+    return {.options = std::move(options)};
+}
+
+ParseValidateArgsResult parse_validate_args(int argc, char** argv) {
+    if (argc < 3) {
+        return {.error = "validate requires an input path"};
+    }
+
+    ValidateOptions options{.input_path = argv[2]};
+    for (int i = 3; i < argc; ++i) {
+        const std::string_view arg = argv[i];
+        if (arg == "--json") {
+            options.json_output = true;
+        } else {
+            return {.error = "unknown validate option: " + std::string(arg)};
         }
     }
     return {.options = std::move(options)};
@@ -790,6 +824,135 @@ int run_errors(const ErrorsOptions& options) {
     return analysis->summary.parse_errors.total == 0 ? 0 : 3;
 }
 
+std::vector<ValidationIssue> validate_analysis(const streamview::analysis::StreamAnalysis& analysis) {
+    std::vector<ValidationIssue> issues;
+    if (analysis.summary.parse_errors.total > 0) {
+        issues.push_back({
+            .severity = "error",
+            .code = "parse_errors",
+            .message = "bitstream contains parser errors",
+        });
+    }
+    if (analysis.nals.empty()) {
+        issues.push_back({
+            .severity = "error",
+            .code = "no_nal_units",
+            .message = "input does not contain Annex B NAL units",
+        });
+        return issues;
+    }
+    if (analysis.summary.frame_count == 0) {
+        issues.push_back({
+            .severity = "warning",
+            .code = "no_frames",
+            .message = "no coded frames were identified",
+        });
+    }
+    if (analysis.summary.keyframe_count == 0) {
+        issues.push_back({
+            .severity = "warning",
+            .code = "no_keyframes",
+            .message = "no keyframes were identified",
+        });
+    }
+    if (analysis.codec_guess == "h264" && analysis.summary.sps_count == 0) {
+        issues.push_back({
+            .severity = "warning",
+            .code = "missing_h264_sps",
+            .message = "H.264 stream has no parsed SPS",
+        });
+    }
+    if (analysis.codec_guess == "h264" && analysis.summary.pps_count == 0) {
+        issues.push_back({
+            .severity = "warning",
+            .code = "missing_h264_pps",
+            .message = "H.264 stream has no parsed PPS",
+        });
+    }
+    if (analysis.codec_guess == "h265" && analysis.summary.vps_count == 0) {
+        issues.push_back({
+            .severity = "warning",
+            .code = "missing_h265_vps",
+            .message = "H.265 stream has no parsed VPS",
+        });
+    }
+    if (analysis.codec_guess == "h265" && analysis.summary.sps_count == 0) {
+        issues.push_back({
+            .severity = "warning",
+            .code = "missing_h265_sps",
+            .message = "H.265 stream has no parsed SPS",
+        });
+    }
+    if (analysis.codec_guess == "h265" && analysis.summary.pps_count == 0) {
+        issues.push_back({
+            .severity = "warning",
+            .code = "missing_h265_pps",
+            .message = "H.265 stream has no parsed PPS",
+        });
+    }
+    return issues;
+}
+
+bool has_validation_errors(const std::vector<ValidationIssue>& issues) {
+    for (const auto& issue : issues) {
+        if (issue.severity == "error") {
+            return true;
+        }
+    }
+    return false;
+}
+
+void write_validate_text(std::ostream& out, const std::vector<ValidationIssue>& issues) {
+    out << "Validation issues: " << issues.size() << "\n";
+    for (const auto& issue : issues) {
+        out << issue.severity << " " << issue.code << ": " << issue.message << "\n";
+    }
+}
+
+void write_validate_json(std::ostream& out, const streamview::analysis::StreamAnalysis& analysis,
+                         const std::vector<ValidationIssue>& issues) {
+    out << "{\n";
+    out << "  \"input\": ";
+    streamview::exporter::write_json_string(out, analysis.input_path);
+    out << ",\n";
+    out << "  \"codec_guess\": ";
+    streamview::exporter::write_json_string(out, analysis.codec_guess);
+    out << ",\n";
+    out << "  \"issue_count\": " << issues.size() << ",\n";
+    out << "  \"issues\": [\n";
+    for (std::size_t i = 0; i < issues.size(); ++i) {
+        const auto& issue = issues[i];
+        out << "    {\n";
+        out << "      \"severity\": ";
+        streamview::exporter::write_json_string(out, issue.severity);
+        out << ",\n";
+        out << "      \"code\": ";
+        streamview::exporter::write_json_string(out, issue.code);
+        out << ",\n";
+        out << "      \"message\": ";
+        streamview::exporter::write_json_string(out, issue.message);
+        out << "\n";
+        out << "    }" << (i + 1 == issues.size() ? "" : ",") << "\n";
+    }
+    out << "  ]\n";
+    out << "}\n";
+}
+
+int run_validate(const ValidateOptions& options) {
+    const auto analysis = analyze_input(options.input_path);
+    if (!analysis.has_value()) {
+        return 2;
+    }
+
+    const auto issues = validate_analysis(*analysis);
+    if (options.json_output) {
+        write_validate_json(std::cout, *analysis, issues);
+    } else {
+        write_validate_text(std::cout, issues);
+    }
+    return has_validation_errors(issues) ? 3 : 0;
+}
+
 void write_hex_dump(std::ostream& out, std::span<const std::uint8_t> bytes) {
     constexpr std::size_t bytes_per_line = 16;
     const auto old_flags = out.flags();
@@ -901,6 +1064,15 @@ int main(int argc, char** argv) {
             return 1;
         }
         return run_errors(*result.options);
+    }
+    if (command == "validate") {
+        const auto result = parse_validate_args(argc, argv);
+        if (!result.options.has_value()) {
+            std::cerr << "streamview: " << result.error << "\n";
+            print_usage(std::cerr);
+            return 1;
+        }
+        return run_validate(*result.options);
     }
     if (command == "dump") {
         const auto result = parse_dump_args(argc, argv);

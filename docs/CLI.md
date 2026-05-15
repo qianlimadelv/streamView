@@ -11,6 +11,7 @@ streamview analyze <input> [--format text|json] [--output <path|->] [--codec aut
                    [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]
 streamview inspect <input> --nal <index>|--frame <index>|--gop <index>
 streamview errors <input> [--json]
+streamview validate <input> [--json]
 streamview dump <input> --nal <index> [--format hex|payload|rbsp] [--output <path|->]
 ```
 
@@ -35,6 +36,12 @@ that reference the NAL. Frame inspect includes the owning GOP index when known.
 
 `errors` prints only parser failures and is intended for quick stream triage.
 Use `--json` when scripting.
+
+## Validate
+
+`validate` runs lightweight structural checks over the analysis model. It
+currently reports parser errors, empty Annex B input, missing frames/keyframes,
+and missing parameter sets. Use `--json` for CI or scripts.
 
 ## Dump
 

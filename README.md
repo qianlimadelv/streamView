@@ -74,6 +74,8 @@ sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
 ./build/apps/streamview-cli/streamview inspect samples/example.h264 --gop 0
 ./build/apps/streamview-cli/streamview errors samples/example.h264
 ./build/apps/streamview-cli/streamview errors samples/example.h264 --json
+./build/apps/streamview-cli/streamview validate samples/example.h264
+./build/apps/streamview-cli/streamview validate samples/example.h264 --json
 ./build/apps/streamview-cli/streamview dump samples/example.h264 --nal 0 --format hex
 ./build/apps/streamview-cli/streamview dump samples/example.h264 --nal 0 --format payload --output nal0.bin
 ```
@@ -83,8 +85,9 @@ counts. With `--json`, it writes the full NAL/frame/GOP analysis model to the
 selected file. Use `--json-mode summary` for large streams when only the top
 level summary is needed. Use `--limit-nals` when only the first N NAL details
 are needed in full JSON. Use `inspect` to print one NAL/frame/GOP directly.
-Use `errors` to list parse failures quickly. Use `dump` to export one NAL as
-hex text, raw payload bytes, or RBSP bytes.
+Use `errors` to list parse failures quickly. Use `validate` to run basic
+scriptable stream checks. Use `dump` to export one NAL as hex text, raw payload
+bytes, or RBSP bytes.
 
 The newer output options are:
 
