@@ -111,7 +111,7 @@ std::vector<std::uint8_t> make_minimal_h265_stream() {
         0x00, 0x00, 0x01,
         0x44, 0x01, 0xc0,
         0x00, 0x00, 0x01,
-        0x26, 0x01, 0x80,
+        0x26, 0x01, 0xb0,
     };
     stream.insert(stream.end(), tail.begin(), tail.end());
     return stream;
@@ -171,6 +171,9 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.nals[0].h265->header.nal_unit_type == streamview::bitstream::H265NalType::Vps, "first H.265 VPS");
     require(analysis.nals[1].h265.has_value() && analysis.nals[1].h265->sps.has_value(), "second H.265 SPS");
     require(analysis.nals[3].h265->header.nal_unit_type == streamview::bitstream::H265NalType::IdrWRadl, "fourth H.265 IDR");
+    require(analysis.nals[3].h265->slice.has_value(), "fourth H.265 slice");
+    require(analysis.nals[3].h265->slice->first_slice_segment_in_pic_flag, "H.265 slice first flag");
+    require(analysis.nals[3].h265->slice->slice_pic_parameter_set_id == 0, "H.265 slice PPS id");
     require(analysis.frames.size() == 1, "H.265 frames size");
     require(analysis.frames[0].codec == "h265", "H.265 frame codec");
     require(analysis.frames[0].frame_type == "IDR", "H.265 frame type");

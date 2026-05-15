@@ -5,6 +5,7 @@
 #include "streamview/bitstream/h264_slice.hpp"
 #include "streamview/bitstream/h264_sps.hpp"
 #include "streamview/bitstream/h265_nal.hpp"
+#include "streamview/bitstream/h265_slice.hpp"
 #include "streamview/bitstream/h265_sps.hpp"
 #include "streamview/bitstream/rbsp.hpp"
 
@@ -269,6 +270,21 @@ void test_parses_h265_sps_dimensions() {
     require(result.info->height == 360, "H.265 SPS height");
 }
 
+void test_parses_h265_slice_header_prefix() {
+    const std::vector<std::uint8_t> slice{0x26, 0x01, 0xb0};
+
+    const auto result = streamview::bitstream::parse_h265_slice_header(
+        slice,
+        streamview::bitstream::H265NalType::IdrWRadl);
+
+    require(result.status.is_ok(), "H.265 slice parse status");
+    require(result.info.has_value(), "H.265 slice info present");
+    require(result.info->first_slice_segment_in_pic_flag, "H.265 first slice segment");
+    require(result.info->no_output_of_prior_pics_flag_present, "H.265 no output present");
+    require(!result.info->no_output_of_prior_pics_flag, "H.265 no output flag");
+    require(result.info->slice_pic_parameter_set_id == 0, "H.265 slice PPS id");
+}
+
 } // namespace
 
 int main() {
@@ -284,5 +300,6 @@ int main() {
     test_parses_h264_slice_header_prefix();
     test_parses_h265_nal_header();
     test_parses_h265_sps_dimensions();
+    test_parses_h265_slice_header_prefix();
     return 0;
 }

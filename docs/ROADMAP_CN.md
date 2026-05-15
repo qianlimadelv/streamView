@@ -34,9 +34,10 @@
 - VPS/SPS/PPS 识别
 - SPS 基础字段解析
 - H.265 宽高推导
+- H.265 slice header 前缀字段
 - VCL NAL 计数
 - H.265 golden JSON 测试
-- 后续补 VPS/PPS 字段解析和 H.265 slice header 解析
+- 后续补 VPS/PPS 字段解析、slice_type 和 POC
 
 ## Phase 4：Container Input
 

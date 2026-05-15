@@ -78,6 +78,13 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                 ++analysis.summary.pps_count;
             } else if (bitstream::h265_nal_type_is_vcl(nal.h265->header.nal_unit_type)) {
                 ++analysis.summary.slices.total;
+                const auto payload = data.subspan(unit.payload_offset, unit.payload_size);
+                const auto slice = bitstream::parse_h265_slice_header(payload, nal.h265->header.nal_unit_type);
+                if (slice.status.is_ok() && slice.info.has_value()) {
+                    nal.h265->slice = *slice.info;
+                } else {
+                    nal.h265->slice_parse_error = slice.status.message();
+                }
                 add_h265_frame(analysis, nal);
             }
         }

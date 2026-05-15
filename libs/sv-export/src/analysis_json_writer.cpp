@@ -97,6 +97,18 @@ void write_h265_sps_json(std::ostream& out, const bitstream::H265SpsInfo& sps) {
     out << "        }\n";
 }
 
+void write_h265_slice_json(std::ostream& out, const bitstream::H265SliceHeaderInfo& slice) {
+    out << "        \"slice\": {\n";
+    out << "          \"first_slice_segment_in_pic_flag\": "
+        << (slice.first_slice_segment_in_pic_flag ? "true" : "false") << ",\n";
+    out << "          \"no_output_of_prior_pics_flag_present\": "
+        << (slice.no_output_of_prior_pics_flag_present ? "true" : "false") << ",\n";
+    out << "          \"no_output_of_prior_pics_flag\": "
+        << (slice.no_output_of_prior_pics_flag ? "true" : "false") << ",\n";
+    out << "          \"slice_pic_parameter_set_id\": " << slice.slice_pic_parameter_set_id << "\n";
+    out << "        }\n";
+}
+
 void write_slice_json(std::ostream& out, const bitstream::H264SliceHeaderInfo& slice) {
     out << "        \"slice\": {\n";
     out << "          \"first_mb_in_slice\": " << slice.first_mb_in_slice << ",\n";
@@ -161,10 +173,18 @@ void write_h265_details_json(std::ostream& out, const analysis::H265NalAnalysis&
     if (h265.sps.has_value()) {
         out << ",\n";
         write_h265_sps_json(out, *h265.sps);
+    } else if (h265.slice.has_value()) {
+        out << ",\n";
+        write_h265_slice_json(out, *h265.slice);
     } else if (h265.sps_parse_error.has_value()) {
         out << ",\n";
         out << "        \"sps_parse_error\": ";
         write_json_string(out, *h265.sps_parse_error);
+        out << "\n";
+    } else if (h265.slice_parse_error.has_value()) {
+        out << ",\n";
+        out << "        \"slice_parse_error\": ";
+        write_json_string(out, *h265.slice_parse_error);
         out << "\n";
     } else {
         out << "\n";
