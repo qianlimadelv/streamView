@@ -130,10 +130,10 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                 if (slice.status.is_ok() && slice.info.has_value()) {
                     nal.h265->slice = *slice.info;
                     add_h265_slice_to_summary(analysis.summary, *slice.info);
+                    add_h265_frame(analysis, nal);
                 } else {
                     nal.h265->slice_parse_error = slice.status.message();
                 }
-                add_h265_frame(analysis, nal);
             }
         }
 

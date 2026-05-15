@@ -38,6 +38,7 @@
 - H.265 slice header 前缀字段
 - H.265 slice_type 基础解析
 - VCL NAL 计数
+- 畸形参数集和 slice 输入测试
 - H.265 golden JSON 测试
 - 后续补 VPS 字段解析、PPS 完整字段解析和 POC
 

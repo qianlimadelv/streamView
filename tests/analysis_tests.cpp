@@ -191,10 +191,60 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.gops[0].starts_with_keyframe, "H.265 GOP keyframe start");
 }
 
+void test_records_h264_parse_errors_without_frames() {
+    const std::vector<std::uint8_t> stream{
+        0x00, 0x00, 0x01,
+        0x67, 0x64,
+        0x00, 0x00, 0x01,
+        0x65, 0x88,
+    };
+
+    const auto analysis = streamview::analysis::analyze_h264_annex_b("bad.h264", stream);
+
+    require(analysis.nals.size() == 2, "bad H.264 NAL count");
+    require(analysis.summary.sps_count == 1, "bad H.264 SPS count");
+    require(!analysis.summary.active_sps.has_value(), "bad H.264 active SPS absent");
+    require(analysis.summary.frame_count == 0, "bad H.264 frame count");
+    require(analysis.summary.slices.total == 0, "bad H.264 slice count");
+    require(analysis.nals[0].h264.has_value(), "bad H.264 SPS analysis present");
+    require(analysis.nals[0].h264->sps_parse_error.has_value(), "bad H.264 SPS error");
+    require(analysis.nals[1].h264.has_value(), "bad H.264 slice analysis present");
+    require(analysis.nals[1].h264->slice_parse_error.has_value(), "bad H.264 missing SPS error");
+}
+
+void test_records_h265_parse_errors_without_crashing() {
+    const std::vector<std::uint8_t> stream{
+        0x00, 0x00, 0x01,
+        0x42, 0x01,
+        0x00, 0x00, 0x01,
+        0x44, 0x01,
+        0x00, 0x00, 0x01,
+        0x26, 0x01,
+    };
+
+    const auto analysis = streamview::analysis::analyze_h265_annex_b("bad.h265", stream);
+
+    require(analysis.nals.size() == 3, "bad H.265 NAL count");
+    require(analysis.summary.sps_count == 1, "bad H.265 SPS count");
+    require(analysis.summary.pps_count == 1, "bad H.265 PPS count");
+    require(analysis.summary.frame_count == 0, "bad H.265 frame count");
+    require(analysis.summary.slices.total == 0, "bad H.265 parsed slice count");
+    require(!analysis.summary.active_h265_sps.has_value(), "bad H.265 active SPS absent");
+    require(analysis.nals[0].h265.has_value(), "bad H.265 SPS analysis present");
+    require(analysis.nals[0].h265->sps_parse_error.has_value(), "bad H.265 SPS error");
+    require(analysis.nals[1].h265.has_value(), "bad H.265 PPS analysis present");
+    require(analysis.nals[1].h265->pps_parse_error.has_value(), "bad H.265 PPS error");
+    require(analysis.nals[2].h265.has_value(), "bad H.265 slice analysis present");
+    require(analysis.nals[2].h265->slice_parse_error.has_value(), "bad H.265 slice error");
+    require(analysis.frames.empty(), "bad H.265 frames empty");
+}
+
 } // namespace
 
 int main() {
     test_analyzes_minimal_h264_stream();
     test_analyzes_minimal_h265_stream();
+    test_records_h264_parse_errors_without_frames();
+    test_records_h265_parse_errors_without_crashing();
     return 0;
 }

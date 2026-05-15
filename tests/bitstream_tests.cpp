@@ -240,6 +240,20 @@ void test_parses_h264_slice_header_prefix() {
     require(streamview::bitstream::h264_slice_kind_name(result.info->slice_kind) == "I", "slice kind name");
 }
 
+void test_rejects_truncated_h264_parameter_sets_and_slice() {
+    const std::vector<std::uint8_t> sps_payload{0x67, 0x64};
+    const std::vector<std::uint8_t> pps_payload{0x68};
+    const std::vector<std::uint8_t> slice_payload{0x65};
+
+    const auto sps = streamview::bitstream::parse_h264_sps(sps_payload);
+    const auto pps = streamview::bitstream::parse_h264_pps(pps_payload);
+    const auto slice = streamview::bitstream::parse_h264_slice_header(slice_payload, 0);
+
+    require(!sps.status.is_ok() && !sps.info.has_value(), "truncated H.264 SPS should fail");
+    require(!pps.status.is_ok() && !pps.info.has_value(), "truncated H.264 PPS should fail");
+    require(!slice.status.is_ok() && !slice.info.has_value(), "truncated H.264 slice should fail");
+}
+
 void test_parses_h265_nal_header() {
     const auto vps = streamview::bitstream::parse_h265_nal_header(0x40, 0x01);
     require(vps.forbidden_zero_bit == 0, "H.265 VPS forbidden_zero_bit");
@@ -305,6 +319,23 @@ void test_parses_h265_pps_baseline_fields() {
     require(result.info->num_extra_slice_header_bits == 0, "H.265 PPS extra header bits");
 }
 
+void test_rejects_truncated_h265_parameter_sets_and_slice() {
+    const std::vector<std::uint8_t> sps_payload{0x42, 0x01};
+    const std::vector<std::uint8_t> pps_payload{0x44, 0x01};
+    const std::vector<std::uint8_t> slice_payload{0x26, 0x01};
+
+    const auto sps = streamview::bitstream::parse_h265_sps(sps_payload);
+    const auto pps = streamview::bitstream::parse_h265_pps(pps_payload);
+    const auto slice = streamview::bitstream::parse_h265_slice_header(
+        slice_payload,
+        streamview::bitstream::H265NalType::IdrWRadl,
+        0);
+
+    require(!sps.status.is_ok() && !sps.info.has_value(), "truncated H.265 SPS should fail");
+    require(!pps.status.is_ok() && !pps.info.has_value(), "truncated H.265 PPS should fail");
+    require(!slice.status.is_ok() && !slice.info.has_value(), "truncated H.265 slice should fail");
+}
+
 } // namespace
 
 int main() {
@@ -318,9 +349,11 @@ int main() {
     test_parses_h264_sps_dimensions();
     test_parses_h264_pps_baseline_fields();
     test_parses_h264_slice_header_prefix();
+    test_rejects_truncated_h264_parameter_sets_and_slice();
     test_parses_h265_nal_header();
     test_parses_h265_sps_dimensions();
     test_parses_h265_pps_baseline_fields();
     test_parses_h265_slice_header_prefix();
+    test_rejects_truncated_h265_parameter_sets_and_slice();
     return 0;
 }
