@@ -58,6 +58,23 @@ set_tests_properties(streamview-cli-json-summary-h264-minimal
 )
 
 add_test(
+    NAME streamview-cli-limited-json-h264-minimal
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_minimal_limited.actual.json
+        -DSTREAMVIEW_LIMIT_NALS=2
+        -DSTREAMVIEW_EXPECTED_OMITTED=1
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_limited_json_test.cmake
+)
+
+set_tests_properties(streamview-cli-limited-json-h264-minimal
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
     NAME streamview-cli-summary-h264-minimal
     COMMAND
         ${CMAKE_COMMAND}

@@ -308,7 +308,7 @@ void write_gops_json(std::ostream& out, const std::vector<analysis::GopAnalysis>
 
 } // namespace
 
-void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis, AnalysisJsonMode mode) {
+void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis, AnalysisJsonOptions options) {
     out << "{\n";
     out << "  \"format\": ";
     write_json_string(out, analysis.format);
@@ -322,7 +322,7 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
     out << "  \"size_bytes\": " << analysis.size_bytes << ",\n";
     out << "  \"nal_count\": " << analysis.nals.size() << ",\n";
     write_stream_summary_json(out, analysis.summary);
-    if (mode == AnalysisJsonMode::Summary) {
+    if (options.mode == AnalysisJsonMode::Summary) {
         out << "  \"frames_omitted\": " << analysis.frames.size() << ",\n";
         out << "  \"gops_omitted\": " << analysis.gops.size() << ",\n";
         out << "  \"nals_omitted\": " << analysis.nals.size() << "\n";
@@ -334,7 +334,10 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
     write_gops_json(out, analysis.gops);
     out << "  \"nals\": [\n";
 
-    for (std::size_t i = 0; i < analysis.nals.size(); ++i) {
+    const std::size_t nals_to_write = options.nal_limit.has_value() && *options.nal_limit < analysis.nals.size()
+                                          ? *options.nal_limit
+                                          : analysis.nals.size();
+    for (std::size_t i = 0; i < nals_to_write; ++i) {
         const auto& nal = analysis.nals[i];
         out << "    {\n";
         out << "      \"index\": " << nal.index << ",\n";
@@ -347,15 +350,25 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
         } else if (nal.h265.has_value()) {
             write_h265_details_json(out, *nal.h265);
         }
-        out << "    }" << (i + 1 == analysis.nals.size() ? "\n" : ",\n");
+        out << "    }" << (i + 1 == nals_to_write ? "\n" : ",\n");
     }
 
-    out << "  ]\n";
+    out << "  ]";
+    if (nals_to_write < analysis.nals.size()) {
+        out << ",\n";
+        out << "  \"nals_omitted\": " << (analysis.nals.size() - nals_to_write) << "\n";
+    } else {
+        out << "\n";
+    }
     out << "}\n";
 }
 
+void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis, AnalysisJsonMode mode) {
+    write_analysis_json(out, analysis, AnalysisJsonOptions{.mode = mode});
+}
+
 void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis) {
-    write_analysis_json(out, analysis, AnalysisJsonMode::Full);
+    write_analysis_json(out, analysis, AnalysisJsonOptions{});
 }
 
 } // namespace streamview::exporter

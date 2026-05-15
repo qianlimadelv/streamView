@@ -10,6 +10,7 @@
 #include <iterator>
 #include <optional>
 #include <filesystem>
+#include <charconv>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,11 +21,12 @@ struct AnalyzeOptions {
     std::string input_path;
     std::optional<std::string> json_output_path;
     streamview::exporter::AnalysisJsonMode json_mode{streamview::exporter::AnalysisJsonMode::Full};
+    std::optional<std::size_t> nal_limit;
 };
 
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
-        << "  streamview analyze <input.h264> [--json <output.json>] [--json-mode full|summary]\n"
+        << "  streamview analyze <input.h264> [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
         << "  streamview --help\n";
 }
 
@@ -36,6 +38,17 @@ std::optional<streamview::exporter::AnalysisJsonMode> parse_json_mode(std::strin
         return streamview::exporter::AnalysisJsonMode::Summary;
     }
     return std::nullopt;
+}
+
+std::optional<std::size_t> parse_size_arg(std::string_view value) {
+    std::size_t parsed{};
+    const auto* begin = value.data();
+    const auto* end = value.data() + value.size();
+    const auto result = std::from_chars(begin, end, parsed);
+    if (result.ec != std::errc{} || result.ptr != end) {
+        return std::nullopt;
+    }
+    return parsed;
 }
 
 std::optional<AnalyzeOptions> parse_analyze_args(int argc, char** argv) {
@@ -60,6 +73,15 @@ std::optional<AnalyzeOptions> parse_analyze_args(int argc, char** argv) {
                 return std::nullopt;
             }
             options.json_mode = *mode;
+        } else if (arg == "--limit-nals") {
+            if (i + 1 >= argc) {
+                return std::nullopt;
+            }
+            const auto limit = parse_size_arg(argv[++i]);
+            if (!limit.has_value()) {
+                return std::nullopt;
+            }
+            options.nal_limit = *limit;
         } else {
             return std::nullopt;
         }
@@ -154,7 +176,13 @@ int write_json_output(const AnalyzeOptions& options, const streamview::analysis:
             std::cerr << "streamview: failed to open JSON output file: " << *options.json_output_path << "\n";
             return 2;
         }
-        streamview::exporter::write_analysis_json(output, analysis, options.json_mode);
+        streamview::exporter::write_analysis_json(
+            output,
+            analysis,
+            streamview::exporter::AnalysisJsonOptions{
+                .mode = options.json_mode,
+                .nal_limit = options.nal_limit,
+            });
         return 0;
     }
 
