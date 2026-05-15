@@ -9,23 +9,23 @@
 - H.264 NAL header 解析
 - NAL type 名称
 
-尚未支持：
-
-- SPS/PPS 字段完整解析
-- Slice header 解析
-- POC 推导
-- 帧重建
-- 合规性验证
-
 ## H.264 Phase 2
 
-计划支持：
+已支持：
 
 - RBSP extraction
 - Exp-Golomb decoding
 - SPS 基础字段
 - PPS 基础字段
 - 宽高推导
+- Slice header 基础字段
+
+尚未支持：
+
+- SPS/PPS 字段完整解析
+- POC 推导
+- 多 slice 帧聚合
+- 合规性验证
 
 ## H.265 Phase 1
 
@@ -34,14 +34,16 @@
 - 复用 Annex B 扫描
 - H.265 NAL header 解析
 - VPS/SPS/PPS 识别
+- H.265 SPS 基础字段
+- H.265 宽高推导
 - VCL NAL 计数
 - CLI golden JSON 测试
 
 尚未支持：
 
-- H.265 VPS/SPS/PPS 字段解析
-- H.265 宽高推导
+- H.265 VPS/PPS 字段解析
 - H.265 slice header 解析
+- H.265 POC 推导
 
 ## Parser 标准说明
 

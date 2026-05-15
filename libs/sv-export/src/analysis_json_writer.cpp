@@ -34,6 +34,17 @@ void write_stream_summary_json(std::ostream& out, const analysis::StreamSummary&
         out << "      \"width\": " << summary.active_sps->width << ",\n";
         out << "      \"height\": " << summary.active_sps->height << "\n";
         out << "    }\n";
+    } else if (summary.active_h265_sps.has_value()) {
+        out << ",\n";
+        out << "    \"active_h265_sps\": {\n";
+        out << "      \"profile_idc\": " << static_cast<int>(summary.active_h265_sps->profile_idc) << ",\n";
+        out << "      \"tier_flag\": " << (summary.active_h265_sps->tier_flag ? "true" : "false") << ",\n";
+        out << "      \"level_idc\": " << static_cast<int>(summary.active_h265_sps->level_idc) << ",\n";
+        out << "      \"video_parameter_set_id\": " << summary.active_h265_sps->video_parameter_set_id << ",\n";
+        out << "      \"seq_parameter_set_id\": " << summary.active_h265_sps->seq_parameter_set_id << ",\n";
+        out << "      \"width\": " << summary.active_h265_sps->width << ",\n";
+        out << "      \"height\": " << summary.active_h265_sps->height << "\n";
+        out << "    }\n";
     } else {
         out << "\n";
     }
@@ -66,6 +77,23 @@ void write_pps_json(std::ostream& out, const bitstream::H264PpsInfo& pps) {
     out << "          \"bottom_field_pic_order_in_frame_present_flag\": "
         << (pps.bottom_field_pic_order_in_frame_present_flag ? "true" : "false") << ",\n";
     out << "          \"num_slice_groups_minus1\": " << pps.num_slice_groups_minus1 << "\n";
+    out << "        }\n";
+}
+
+void write_h265_sps_json(std::ostream& out, const bitstream::H265SpsInfo& sps) {
+    out << "        \"sps\": {\n";
+    out << "          \"profile_idc\": " << static_cast<int>(sps.profile_idc) << ",\n";
+    out << "          \"tier_flag\": " << (sps.tier_flag ? "true" : "false") << ",\n";
+    out << "          \"level_idc\": " << static_cast<int>(sps.level_idc) << ",\n";
+    out << "          \"video_parameter_set_id\": " << sps.video_parameter_set_id << ",\n";
+    out << "          \"max_sub_layers_minus1\": " << sps.max_sub_layers_minus1 << ",\n";
+    out << "          \"seq_parameter_set_id\": " << sps.seq_parameter_set_id << ",\n";
+    out << "          \"chroma_format_idc\": " << sps.chroma_format_idc << ",\n";
+    out << "          \"bit_depth_luma\": " << static_cast<int>(sps.bit_depth_luma) << ",\n";
+    out << "          \"bit_depth_chroma\": " << static_cast<int>(sps.bit_depth_chroma) << ",\n";
+    out << "          \"width\": " << sps.width << ",\n";
+    out << "          \"height\": " << sps.height << ",\n";
+    out << "          \"conformance_window_flag\": " << (sps.conformance_window_flag ? "true" : "false") << "\n";
     out << "        }\n";
 }
 
@@ -129,7 +157,18 @@ void write_h265_details_json(std::ostream& out, const analysis::H265NalAnalysis&
     write_json_string(out, bitstream::h265_nal_type_name(h265.header.nal_unit_type));
     out << ",\n";
     out << "        \"nuh_layer_id\": " << static_cast<int>(h265.header.nuh_layer_id) << ",\n";
-    out << "        \"nuh_temporal_id_plus1\": " << static_cast<int>(h265.header.nuh_temporal_id_plus1) << "\n";
+    out << "        \"nuh_temporal_id_plus1\": " << static_cast<int>(h265.header.nuh_temporal_id_plus1);
+    if (h265.sps.has_value()) {
+        out << ",\n";
+        write_h265_sps_json(out, *h265.sps);
+    } else if (h265.sps_parse_error.has_value()) {
+        out << ",\n";
+        out << "        \"sps_parse_error\": ";
+        write_json_string(out, *h265.sps_parse_error);
+        out << "\n";
+    } else {
+        out << "\n";
+    }
     out << "      }\n";
 }
 

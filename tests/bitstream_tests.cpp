@@ -5,6 +5,7 @@
 #include "streamview/bitstream/h264_slice.hpp"
 #include "streamview/bitstream/h264_sps.hpp"
 #include "streamview/bitstream/h265_nal.hpp"
+#include "streamview/bitstream/h265_sps.hpp"
 #include "streamview/bitstream/rbsp.hpp"
 
 #include <cstdint>
@@ -15,6 +16,76 @@
 #include <vector>
 
 namespace {
+
+class TestBitWriter {
+public:
+    void write_bits(std::uint32_t value, std::size_t count) {
+        for (std::size_t i = 0; i < count; ++i) {
+            const std::size_t shift = count - 1 - i;
+            write_bit(((value >> shift) & 0x01U) != 0U);
+        }
+    }
+
+    void write_bit(bool value) {
+        if (bit_offset_ == 0) {
+            data_.push_back(0);
+        }
+        if (value) {
+            data_.back() |= static_cast<std::uint8_t>(1U << (7 - bit_offset_));
+        }
+        bit_offset_ = (bit_offset_ + 1) % 8;
+    }
+
+    void write_ue(std::uint32_t value) {
+        const std::uint32_t code_num = value + 1;
+        std::size_t bits = 0;
+        for (std::uint32_t tmp = code_num; tmp > 0; tmp >>= 1U) {
+            ++bits;
+        }
+        for (std::size_t i = 1; i < bits; ++i) {
+            write_bit(false);
+        }
+        write_bits(code_num, bits);
+    }
+
+    std::vector<std::uint8_t> finish_rbsp() {
+        write_bit(true);
+        while (bit_offset_ != 0) {
+            write_bit(false);
+        }
+        return data_;
+    }
+
+private:
+    std::vector<std::uint8_t> data_;
+    std::size_t bit_offset_{};
+};
+
+std::vector<std::uint8_t> make_h265_sps_payload(std::uint32_t width, std::uint32_t height) {
+    TestBitWriter writer;
+    writer.write_bits(0, 4);   // sps_video_parameter_set_id
+    writer.write_bits(0, 3);   // sps_max_sub_layers_minus1
+    writer.write_bit(true);    // sps_temporal_id_nesting_flag
+    writer.write_bits(0, 2);   // general_profile_space
+    writer.write_bit(false);   // general_tier_flag
+    writer.write_bits(1, 5);   // general_profile_idc
+    writer.write_bits(0, 32);  // compatibility flags
+    writer.write_bits(0, 32);  // constraint flags high bits
+    writer.write_bits(0, 16);  // constraint flags low bits
+    writer.write_bits(120, 8); // general_level_idc
+    writer.write_ue(0);        // sps_seq_parameter_set_id
+    writer.write_ue(1);        // chroma_format_idc
+    writer.write_ue(width);
+    writer.write_ue(height);
+    writer.write_bit(false); // conformance_window_flag
+    writer.write_ue(0);      // bit_depth_luma_minus8
+    writer.write_ue(0);      // bit_depth_chroma_minus8
+
+    auto rbsp = writer.finish_rbsp();
+    std::vector<std::uint8_t> payload{0x42, 0x01};
+    payload.insert(payload.end(), rbsp.begin(), rbsp.end());
+    return payload;
+}
 
 void require(bool condition, std::string_view message) {
     if (!condition) {
@@ -180,6 +251,24 @@ void test_parses_h265_nal_header() {
     require(streamview::bitstream::h265_nal_type_is_vcl(idr.nal_unit_type), "H.265 IDR is VCL");
 }
 
+void test_parses_h265_sps_dimensions() {
+    const auto sps = make_h265_sps_payload(640, 360);
+
+    const auto result = streamview::bitstream::parse_h265_sps(sps);
+
+    require(result.status.is_ok(), "H.265 SPS parse status");
+    require(result.info.has_value(), "H.265 SPS info present");
+    require(result.info->profile_idc == 1, "H.265 SPS profile_idc");
+    require(result.info->level_idc == 120, "H.265 SPS level_idc");
+    require(result.info->video_parameter_set_id == 0, "H.265 SPS vps id");
+    require(result.info->seq_parameter_set_id == 0, "H.265 SPS sps id");
+    require(result.info->chroma_format_idc == 1, "H.265 SPS chroma_format_idc");
+    require(result.info->bit_depth_luma == 8, "H.265 SPS bit_depth_luma");
+    require(result.info->bit_depth_chroma == 8, "H.265 SPS bit_depth_chroma");
+    require(result.info->width == 640, "H.265 SPS width");
+    require(result.info->height == 360, "H.265 SPS height");
+}
+
 } // namespace
 
 int main() {
@@ -194,5 +283,6 @@ int main() {
     test_parses_h264_pps_baseline_fields();
     test_parses_h264_slice_header_prefix();
     test_parses_h265_nal_header();
+    test_parses_h265_sps_dimensions();
     return 0;
 }

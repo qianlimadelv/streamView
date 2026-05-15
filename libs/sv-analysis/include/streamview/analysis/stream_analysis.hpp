@@ -6,6 +6,7 @@
 #include "streamview/bitstream/h264_slice.hpp"
 #include "streamview/bitstream/h264_sps.hpp"
 #include "streamview/bitstream/h265_nal.hpp"
+#include "streamview/bitstream/h265_sps.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -27,6 +28,7 @@ struct SliceStats {
 
 struct StreamSummary {
     std::optional<bitstream::H264SpsInfo> active_sps;
+    std::optional<bitstream::H265SpsInfo> active_h265_sps;
     std::size_t vps_count{};
     std::size_t sps_count{};
     std::size_t pps_count{};
@@ -48,6 +50,8 @@ struct H264NalAnalysis {
 
 struct H265NalAnalysis {
     bitstream::H265NalHeader header{};
+    std::optional<bitstream::H265SpsInfo> sps;
+    std::optional<std::string> sps_parse_error;
 };
 
 struct NalAnalysis {

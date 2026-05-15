@@ -32,9 +32,11 @@
 - 复用 Annex B scanner
 - H.265 NAL header 解析
 - VPS/SPS/PPS 识别
+- SPS 基础字段解析
+- H.265 宽高推导
 - VCL NAL 计数
 - H.265 golden JSON 测试
-- 后续补 VPS/SPS/PPS 字段解析和宽高推导
+- 后续补 VPS/PPS 字段解析和 H.265 slice header 解析
 
 ## Phase 4：Container Input
 
