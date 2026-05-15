@@ -32,6 +32,7 @@ struct StreamSummary {
     std::size_t pps_count{};
     std::size_t frame_count{};
     std::size_t keyframe_count{};
+    std::size_t gop_count{};
     SliceStats slices;
 };
 
@@ -66,6 +67,16 @@ struct FrameAnalysis {
     std::size_t first_payload_offset{};
 };
 
+struct GopAnalysis {
+    std::size_t index{};
+    std::size_t start_frame_index{};
+    std::size_t end_frame_index{};
+    std::size_t frame_count{};
+    std::size_t keyframe_index{};
+    std::size_t size_bytes{};
+    bool starts_with_keyframe{};
+};
+
 struct StreamAnalysis {
     std::string input_path;
     std::string format{"annex_b"};
@@ -74,9 +85,11 @@ struct StreamAnalysis {
     StreamSummary summary;
     std::vector<NalAnalysis> nals;
     std::vector<FrameAnalysis> frames;
+    std::vector<GopAnalysis> gops;
 };
 
 [[nodiscard]] StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std::uint8_t> data);
 [[nodiscard]] StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std::uint8_t> data);
+void build_gops(StreamAnalysis& analysis);
 
 } // namespace streamview::analysis

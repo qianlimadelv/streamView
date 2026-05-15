@@ -46,7 +46,7 @@ libs/
 
 CLI 当前只是薄入口：读取文件、调用 `analyze_h264_annex_b`、调用 `write_analysis_json`。
 
-当前 `FrameAnalysis` 仍是最小模型：H.264 以成功解析的 slice 生成 frame，H.265 以 VCL NAL 生成 frame。后续需要继续补充多 slice 聚合、POC 和容器时间戳。
+当前 `FrameAnalysis` 仍是最小模型：H.264 以成功解析的 slice 生成 frame，H.265 以 VCL NAL 生成 frame。`GopAnalysis` 基于关键帧切分 GOP；如果码流开头不是关键帧，会生成 `starts_with_keyframe=false` 的 open GOP。后续需要继续补充多 slice 聚合、POC 和容器时间戳。
 
 ## Golden 测试
 

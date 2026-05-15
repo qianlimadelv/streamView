@@ -10,6 +10,7 @@
     "pps_count": 1,
     "frame_count": 1,
     "keyframe_count": 1,
+    "gop_count": 1,
     "slice_count": 1,
     "slice_types": {
       "I": 0,
@@ -28,6 +29,17 @@
       "size_bytes": 6,
       "first_payload_offset": 22,
       "nal_indices": [3]
+    }
+  ],
+  "gops": [
+    {
+      "index": 0,
+      "start_frame_index": 0,
+      "end_frame_index": 0,
+      "frame_count": 1,
+      "keyframe_index": 0,
+      "size_bytes": 6,
+      "starts_with_keyframe": true
     }
   ],
   "nals": [

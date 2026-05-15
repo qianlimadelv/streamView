@@ -68,6 +68,12 @@ void test_analyzes_minimal_h264_stream() {
     require(analysis.frames[0].frame_type == "I", "H.264 frame type");
     require(analysis.frames[0].is_keyframe, "H.264 frame keyframe");
     require(analysis.frames[0].nal_indices.size() == 1 && analysis.frames[0].nal_indices[0] == 2, "H.264 frame NAL index");
+    require(analysis.summary.gop_count == 1, "H.264 GOP count");
+    require(analysis.gops.size() == 1, "H.264 GOP size");
+    require(analysis.gops[0].start_frame_index == 0, "H.264 GOP start");
+    require(analysis.gops[0].end_frame_index == 0, "H.264 GOP end");
+    require(analysis.gops[0].frame_count == 1, "H.264 GOP frame count");
+    require(analysis.gops[0].starts_with_keyframe, "H.264 GOP keyframe start");
 }
 
 void test_analyzes_minimal_h265_stream() {
@@ -91,6 +97,12 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.frames[0].frame_type == "IDR", "H.265 frame type");
     require(analysis.frames[0].is_keyframe, "H.265 frame keyframe");
     require(analysis.frames[0].nal_indices.size() == 1 && analysis.frames[0].nal_indices[0] == 3, "H.265 frame NAL index");
+    require(analysis.summary.gop_count == 1, "H.265 GOP count");
+    require(analysis.gops.size() == 1, "H.265 GOP size");
+    require(analysis.gops[0].start_frame_index == 0, "H.265 GOP start");
+    require(analysis.gops[0].end_frame_index == 0, "H.265 GOP end");
+    require(analysis.gops[0].frame_count == 1, "H.265 GOP frame count");
+    require(analysis.gops[0].starts_with_keyframe, "H.265 GOP keyframe start");
 }
 
 } // namespace

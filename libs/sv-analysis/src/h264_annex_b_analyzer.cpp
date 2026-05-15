@@ -1,5 +1,6 @@
 #include "streamview/analysis/stream_analysis.hpp"
 
+#include <string>
 #include <utility>
 
 namespace streamview::analysis {
@@ -113,6 +114,7 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
         analysis.nals.push_back(std::move(nal));
     }
 
+    build_gops(analysis);
     return analysis;
 }
 

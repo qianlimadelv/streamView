@@ -15,6 +15,7 @@ void write_stream_summary_json(std::ostream& out, const analysis::StreamSummary&
     out << "    \"pps_count\": " << summary.pps_count << ",\n";
     out << "    \"frame_count\": " << summary.frame_count << ",\n";
     out << "    \"keyframe_count\": " << summary.keyframe_count << ",\n";
+    out << "    \"gop_count\": " << summary.gop_count << ",\n";
     out << "    \"slice_count\": " << summary.slices.total << ",\n";
     out << "    \"slice_types\": {\n";
     out << "      \"I\": " << summary.slices.i << ",\n";
@@ -157,6 +158,23 @@ void write_frames_json(std::ostream& out, const std::vector<analysis::FrameAnaly
     out << "  ],\n";
 }
 
+void write_gops_json(std::ostream& out, const std::vector<analysis::GopAnalysis>& gops) {
+    out << "  \"gops\": [\n";
+    for (std::size_t i = 0; i < gops.size(); ++i) {
+        const auto& gop = gops[i];
+        out << "    {\n";
+        out << "      \"index\": " << gop.index << ",\n";
+        out << "      \"start_frame_index\": " << gop.start_frame_index << ",\n";
+        out << "      \"end_frame_index\": " << gop.end_frame_index << ",\n";
+        out << "      \"frame_count\": " << gop.frame_count << ",\n";
+        out << "      \"keyframe_index\": " << gop.keyframe_index << ",\n";
+        out << "      \"size_bytes\": " << gop.size_bytes << ",\n";
+        out << "      \"starts_with_keyframe\": " << (gop.starts_with_keyframe ? "true" : "false") << "\n";
+        out << "    }" << (i + 1 == gops.size() ? "\n" : ",\n");
+    }
+    out << "  ],\n";
+}
+
 } // namespace
 
 void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& analysis) {
@@ -174,6 +192,7 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
     out << "  \"nal_count\": " << analysis.nals.size() << ",\n";
     write_stream_summary_json(out, analysis.summary);
     write_frames_json(out, analysis.frames);
+    write_gops_json(out, analysis.gops);
     out << "  \"nals\": [\n";
 
     for (std::size_t i = 0; i < analysis.nals.size(); ++i) {
