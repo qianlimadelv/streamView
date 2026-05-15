@@ -1,5 +1,6 @@
 #include "streamview/analysis/stream_analysis.hpp"
 #include "streamview/export/analysis_json_writer.hpp"
+#include "streamview/export/json_writer.hpp"
 #if defined(STREAMVIEW_HAS_FFMPEG_DEMUX)
 #include "streamview/demux/ffmpeg_h264_demuxer.hpp"
 #endif
@@ -29,9 +30,20 @@ struct ParseAnalyzeArgsResult {
     std::string error;
 };
 
+struct InspectOptions {
+    std::string input_path;
+    std::size_t nal_index{};
+};
+
+struct ParseInspectArgsResult {
+    std::optional<InspectOptions> options;
+    std::string error;
+};
+
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
         << "  streamview analyze <input.h264> [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
+        << "  streamview inspect <input.h264> --nal <index>\n"
         << "  streamview --help\n";
 }
 
@@ -95,6 +107,36 @@ ParseAnalyzeArgsResult parse_analyze_args(int argc, char** argv) {
     return {.options = std::move(options)};
 }
 
+ParseInspectArgsResult parse_inspect_args(int argc, char** argv) {
+    if (argc < 5) {
+        return {.error = "inspect requires an input path and --nal <index>"};
+    }
+
+    InspectOptions options{.input_path = argv[2]};
+    bool has_nal_index = false;
+    for (int i = 3; i < argc; ++i) {
+        const std::string_view arg = argv[i];
+        if (arg == "--nal") {
+            if (i + 1 >= argc) {
+                return {.error = "--nal requires a non-negative integer"};
+            }
+            const auto index = parse_size_arg(argv[++i]);
+            if (!index.has_value()) {
+                return {.error = "--nal requires a non-negative integer"};
+            }
+            options.nal_index = *index;
+            has_nal_index = true;
+        } else {
+            return {.error = "unknown inspect option: " + std::string(arg)};
+        }
+    }
+
+    if (!has_nal_index) {
+        return {.error = "inspect requires --nal <index>"};
+    }
+    return {.options = std::move(options)};
+}
+
 std::optional<std::vector<std::uint8_t>> read_file(const std::string& path) {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
@@ -108,6 +150,10 @@ std::optional<std::vector<std::uint8_t>> read_file(const std::string& path) {
 
 bool has_extension(const std::string& path, std::string_view extension) {
     return std::filesystem::path(path).extension() == extension;
+}
+
+bool is_h265_input(const std::string& path) {
+    return has_extension(path, ".h265") || has_extension(path, ".265");
 }
 
 std::optional<std::vector<std::uint8_t>> load_input_as_annex_b(const std::string& path) {
@@ -130,6 +176,19 @@ std::optional<std::vector<std::uint8_t>> load_input_as_annex_b(const std::string
     }
 
     return read_file(path);
+}
+
+std::optional<streamview::analysis::StreamAnalysis> analyze_input(const std::string& input_path) {
+    const auto data = load_input_as_annex_b(input_path);
+    if (!data.has_value()) {
+        std::cerr << "streamview: failed to read input file: " << input_path << "\n";
+        return std::nullopt;
+    }
+
+    if (is_h265_input(input_path)) {
+        return streamview::analysis::analyze_h265_annex_b(input_path, *data);
+    }
+    return streamview::analysis::analyze_h264_annex_b(input_path, *data);
 }
 
 void write_text_summary(std::ostream& out, const streamview::analysis::StreamAnalysis& analysis) {
@@ -196,16 +255,89 @@ int write_json_output(const AnalyzeOptions& options, const streamview::analysis:
 }
 
 int run_analyze(const AnalyzeOptions& options) {
-    const auto data = load_input_as_annex_b(options.input_path);
-    if (!data.has_value()) {
-        std::cerr << "streamview: failed to read input file: " << options.input_path << "\n";
+    const auto analysis = analyze_input(options.input_path);
+    if (!analysis.has_value()) {
         return 2;
     }
 
-    const auto analysis = (has_extension(options.input_path, ".h265") || has_extension(options.input_path, ".265"))
-                              ? streamview::analysis::analyze_h265_annex_b(options.input_path, *data)
-                              : streamview::analysis::analyze_h264_annex_b(options.input_path, *data);
-    return write_json_output(options, analysis);
+    return write_json_output(options, *analysis);
+}
+
+void write_nal_inspect_json(std::ostream& out,
+                            const streamview::analysis::StreamAnalysis& analysis,
+                            std::size_t nal_index) {
+    const auto& nal = analysis.nals[nal_index];
+    out << "{\n";
+    out << "  \"input\": ";
+    streamview::exporter::write_json_string(out, analysis.input_path);
+    out << ",\n";
+    out << "  \"codec_guess\": ";
+    streamview::exporter::write_json_string(out, analysis.codec_guess);
+    out << ",\n";
+    out << "  \"nal_count\": " << analysis.nals.size() << ",\n";
+    out << "  \"nal\": {\n";
+    out << "    \"index\": " << nal.index << ",\n";
+    out << "    \"start_code_offset\": " << nal.unit.start_code_offset << ",\n";
+    out << "    \"start_code_size\": " << nal.unit.start_code_size << ",\n";
+    out << "    \"payload_offset\": " << nal.unit.payload_offset << ",\n";
+    out << "    \"payload_size\": " << nal.unit.payload_size;
+
+    if (nal.h264.has_value()) {
+        out << ",\n";
+        out << "    \"codec\": \"h264\",\n";
+        out << "    \"nal_unit_type\": " << static_cast<int>(nal.h264->header.nal_unit_type) << ",\n";
+        out << "    \"nal_unit_type_name\": ";
+        streamview::exporter::write_json_string(out, streamview::bitstream::h264_nal_type_name(nal.h264->header.nal_unit_type));
+        if (nal.h264->sps.has_value()) {
+            out << ",\n";
+            out << "    \"width\": " << nal.h264->sps->width << ",\n";
+            out << "    \"height\": " << nal.h264->sps->height;
+        } else if (nal.h264->slice.has_value()) {
+            out << ",\n";
+            out << "    \"slice_type\": ";
+            streamview::exporter::write_json_string(out, streamview::bitstream::h264_slice_kind_name(nal.h264->slice->slice_kind));
+            out << ",\n";
+            out << "    \"frame_num\": " << nal.h264->slice->frame_num;
+        }
+    } else if (nal.h265.has_value()) {
+        out << ",\n";
+        out << "    \"codec\": \"h265\",\n";
+        out << "    \"nal_unit_type\": " << static_cast<int>(nal.h265->header.nal_unit_type) << ",\n";
+        out << "    \"nal_unit_type_name\": ";
+        streamview::exporter::write_json_string(out, streamview::bitstream::h265_nal_type_name(nal.h265->header.nal_unit_type));
+        if (nal.h265->sps.has_value()) {
+            out << ",\n";
+            out << "    \"width\": " << nal.h265->sps->width << ",\n";
+            out << "    \"height\": " << nal.h265->sps->height;
+        } else if (nal.h265->slice.has_value()) {
+            out << ",\n";
+            out << "    \"slice_pic_parameter_set_id\": " << nal.h265->slice->slice_pic_parameter_set_id;
+            if (nal.h265->slice->slice_type_present) {
+                out << ",\n";
+                out << "    \"slice_type\": ";
+                streamview::exporter::write_json_string(out, streamview::bitstream::h265_slice_kind_name(nal.h265->slice->slice_kind));
+            }
+        }
+    }
+
+    out << "\n";
+    out << "  }\n";
+    out << "}\n";
+}
+
+int run_inspect(const InspectOptions& options) {
+    const auto analysis = analyze_input(options.input_path);
+    if (!analysis.has_value()) {
+        return 2;
+    }
+    if (options.nal_index >= analysis->nals.size()) {
+        std::cerr << "streamview: NAL index out of range: " << options.nal_index
+                  << " >= " << analysis->nals.size() << "\n";
+        return 2;
+    }
+
+    write_nal_inspect_json(std::cout, *analysis, options.nal_index);
+    return 0;
 }
 
 } // namespace
@@ -225,6 +357,15 @@ int main(int argc, char** argv) {
             return 1;
         }
         return run_analyze(*result.options);
+    }
+    if (command == "inspect") {
+        const auto result = parse_inspect_args(argc, argv);
+        if (!result.options.has_value()) {
+            std::cerr << "streamview: " << result.error << "\n";
+            print_usage(std::cerr);
+            return 1;
+        }
+        return run_inspect(*result.options);
     }
 
     std::cerr << "streamview: unknown command: " << command << "\n";
