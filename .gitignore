@@ -1,6 +1,11 @@
 build/
+.codex/
 .cache/
 *.user
 *.swp
 *.swo
 compile_commands.json
+out.json
+*.actual.json
+*.log
+cmake-build-*/

@@ -22,7 +22,6 @@ product and engineering boundaries.
 - `docs/ARCHITECTURE_CN.md`
 - `docs/CODEC-SCOPE_CN.md`
 - `docs/ROADMAP_CN.md`
-- `docs/TODO_CN.md`
 - `AGENTS_CN.md`
 
 ## Build
