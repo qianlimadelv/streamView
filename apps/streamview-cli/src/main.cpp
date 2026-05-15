@@ -42,10 +42,21 @@ struct ParseInspectArgsResult {
     std::string error;
 };
 
+struct ErrorsOptions {
+    std::string input_path;
+    bool json_output{};
+};
+
+struct ParseErrorsArgsResult {
+    std::optional<ErrorsOptions> options;
+    std::string error;
+};
+
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
         << "  streamview analyze <input.h264> [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
         << "  streamview inspect <input.h264> --nal <index>|--frame <index>|--gop <index>\n"
+        << "  streamview errors <input.h264> [--json]\n"
         << "  streamview --help\n";
 }
 
@@ -155,6 +166,23 @@ ParseInspectArgsResult parse_inspect_args(int argc, char** argv) {
 
     if (selector_count != 1) {
         return {.error = "inspect requires exactly one selector: --nal, --frame, or --gop"};
+    }
+    return {.options = std::move(options)};
+}
+
+ParseErrorsArgsResult parse_errors_args(int argc, char** argv) {
+    if (argc < 3) {
+        return {.error = "errors requires an input path"};
+    }
+
+    ErrorsOptions options{.input_path = argv[2]};
+    for (int i = 3; i < argc; ++i) {
+        const std::string_view arg = argv[i];
+        if (arg == "--json") {
+            options.json_output = true;
+        } else {
+            return {.error = "unknown errors option: " + std::string(arg)};
+        }
     }
     return {.options = std::move(options)};
 }
@@ -439,6 +467,96 @@ int run_inspect(const InspectOptions& options) {
     return 1;
 }
 
+std::optional<std::string> nal_parse_error_message(const streamview::analysis::NalAnalysis& nal) {
+    if (nal.h264.has_value()) {
+        if (nal.h264->sps_parse_error.has_value()) {
+            return *nal.h264->sps_parse_error;
+        }
+        if (nal.h264->pps_parse_error.has_value()) {
+            return *nal.h264->pps_parse_error;
+        }
+        if (nal.h264->slice_parse_error.has_value()) {
+            return *nal.h264->slice_parse_error;
+        }
+    }
+    if (nal.h265.has_value()) {
+        if (nal.h265->vps_parse_error.has_value()) {
+            return *nal.h265->vps_parse_error;
+        }
+        if (nal.h265->sps_parse_error.has_value()) {
+            return *nal.h265->sps_parse_error;
+        }
+        if (nal.h265->pps_parse_error.has_value()) {
+            return *nal.h265->pps_parse_error;
+        }
+        if (nal.h265->slice_parse_error.has_value()) {
+            return *nal.h265->slice_parse_error;
+        }
+    }
+    return std::nullopt;
+}
+
+void write_errors_text(std::ostream& out, const streamview::analysis::StreamAnalysis& analysis) {
+    out << "Parse errors: " << analysis.summary.parse_errors.total << "\n";
+    for (const auto& nal : analysis.nals) {
+        const auto message = nal_parse_error_message(nal);
+        if (!message.has_value()) {
+            continue;
+        }
+        out << "NAL " << nal.index
+            << " offset=" << nal.unit.payload_offset
+            << " size=" << nal.unit.payload_size
+            << " error=" << *message << "\n";
+    }
+}
+
+void write_errors_json(std::ostream& out, const streamview::analysis::StreamAnalysis& analysis) {
+    out << "{\n";
+    out << "  \"input\": ";
+    streamview::exporter::write_json_string(out, analysis.input_path);
+    out << ",\n";
+    out << "  \"codec_guess\": ";
+    streamview::exporter::write_json_string(out, analysis.codec_guess);
+    out << ",\n";
+    out << "  \"parse_error_count\": " << analysis.summary.parse_errors.total << ",\n";
+    out << "  \"errors\": [\n";
+    bool first = true;
+    for (const auto& nal : analysis.nals) {
+        const auto message = nal_parse_error_message(nal);
+        if (!message.has_value()) {
+            continue;
+        }
+        if (!first) {
+            out << ",\n";
+        }
+        first = false;
+        out << "    {\n";
+        out << "      \"nal_index\": " << nal.index << ",\n";
+        out << "      \"payload_offset\": " << nal.unit.payload_offset << ",\n";
+        out << "      \"payload_size\": " << nal.unit.payload_size << ",\n";
+        out << "      \"message\": ";
+        streamview::exporter::write_json_string(out, *message);
+        out << "\n";
+        out << "    }";
+    }
+    out << "\n";
+    out << "  ]\n";
+    out << "}\n";
+}
+
+int run_errors(const ErrorsOptions& options) {
+    const auto analysis = analyze_input(options.input_path);
+    if (!analysis.has_value()) {
+        return 2;
+    }
+    if (options.json_output) {
+        write_errors_json(std::cout, *analysis);
+    } else {
+        write_errors_text(std::cout, *analysis);
+    }
+    return analysis->summary.parse_errors.total == 0 ? 0 : 3;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -465,6 +583,15 @@ int main(int argc, char** argv) {
             return 1;
         }
         return run_inspect(*result.options);
+    }
+    if (command == "errors") {
+        const auto result = parse_errors_args(argc, argv);
+        if (!result.options.has_value()) {
+            std::cerr << "streamview: " << result.error << "\n";
+            print_usage(std::cerr);
+            return 1;
+        }
+        return run_errors(*result.options);
     }
 
     std::cerr << "streamview: unknown command: " << command << "\n";
