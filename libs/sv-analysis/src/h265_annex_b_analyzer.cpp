@@ -69,6 +69,11 @@ void add_h265_slice_to_summary(StreamSummary& summary, const bitstream::H265Slic
     }
 }
 
+void add_parse_error(StreamSummary& summary, std::size_t ParseErrorStats::*field) {
+    ++summary.parse_errors.total;
+    ++(summary.parse_errors.*field);
+}
+
 } // namespace
 
 StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std::uint8_t> data) {
@@ -99,6 +104,7 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                     analysis.summary.active_h265_vps = *vps.info;
                 } else {
                     nal.h265->vps_parse_error = vps.status.message();
+                    add_parse_error(analysis.summary, &ParseErrorStats::vps);
                 }
             } else if (nal.h265->header.nal_unit_type == bitstream::H265NalType::Sps) {
                 ++analysis.summary.sps_count;
@@ -109,6 +115,7 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                     analysis.summary.active_h265_sps = *sps.info;
                 } else {
                     nal.h265->sps_parse_error = sps.status.message();
+                    add_parse_error(analysis.summary, &ParseErrorStats::sps);
                 }
             } else if (nal.h265->header.nal_unit_type == bitstream::H265NalType::Pps) {
                 ++analysis.summary.pps_count;
@@ -119,6 +126,7 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                     pps_by_id[pps.info->pic_parameter_set_id] = *pps.info;
                 } else {
                     nal.h265->pps_parse_error = pps.status.message();
+                    add_parse_error(analysis.summary, &ParseErrorStats::pps);
                 }
             } else if (bitstream::h265_nal_type_is_vcl(nal.h265->header.nal_unit_type)) {
                 const auto payload = data.subspan(unit.payload_offset, unit.payload_size);
@@ -141,6 +149,7 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                     add_h265_frame(analysis, nal);
                 } else {
                     nal.h265->slice_parse_error = slice.status.message();
+                    add_parse_error(analysis.summary, &ParseErrorStats::slice);
                 }
             }
         }

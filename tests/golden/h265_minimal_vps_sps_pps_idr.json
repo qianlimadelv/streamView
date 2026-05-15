@@ -19,6 +19,13 @@
       "SP": 0,
       "SI": 0
     },
+    "parse_errors": {
+      "total": 0,
+      "vps": 0,
+      "sps": 0,
+      "pps": 0,
+      "slice": 0
+    },
     "active_h265_vps": {
       "profile_idc": 1,
       "tier_flag": false,

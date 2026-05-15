@@ -163,6 +163,7 @@ void test_analyzes_minimal_h264_stream() {
     require(analysis.summary.keyframe_count == 1, "summary keyframe count");
     require(analysis.summary.slices.total == 1, "summary slice count");
     require(analysis.summary.slices.i == 1, "summary I slice count");
+    require(analysis.summary.parse_errors.total == 0, "summary parse errors");
     require(analysis.summary.active_sps.has_value(), "summary active SPS");
     require(analysis.summary.active_sps->width == 640, "summary width");
     require(analysis.summary.active_sps->height == 360, "summary height");
@@ -202,6 +203,7 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.summary.keyframe_count == 1, "H.265 keyframe count");
     require(analysis.summary.slices.total == 1, "H.265 VCL count");
     require(analysis.summary.slices.i == 1, "H.265 I slice count");
+    require(analysis.summary.parse_errors.total == 0, "H.265 parse errors");
     require(analysis.nals[0].h265.has_value(), "first H.265 NAL");
     require(analysis.nals[0].h265->header.nal_unit_type == streamview::bitstream::H265NalType::Vps, "first H.265 VPS");
     require(analysis.nals[0].h265->vps.has_value(), "first H.265 VPS info");
@@ -241,6 +243,9 @@ void test_records_h264_parse_errors_without_frames() {
     require(!analysis.summary.active_sps.has_value(), "bad H.264 active SPS absent");
     require(analysis.summary.frame_count == 0, "bad H.264 frame count");
     require(analysis.summary.slices.total == 0, "bad H.264 slice count");
+    require(analysis.summary.parse_errors.total == 2, "bad H.264 parse error total");
+    require(analysis.summary.parse_errors.sps == 1, "bad H.264 SPS parse errors");
+    require(analysis.summary.parse_errors.slice == 1, "bad H.264 slice parse errors");
     require(analysis.nals[0].h264.has_value(), "bad H.264 SPS analysis present");
     require(analysis.nals[0].h264->sps_parse_error.has_value(), "bad H.264 SPS error");
     require(analysis.nals[1].h264.has_value(), "bad H.264 slice analysis present");
@@ -267,6 +272,11 @@ void test_records_h265_parse_errors_without_crashing() {
     require(analysis.summary.pps_count == 1, "bad H.265 PPS count");
     require(analysis.summary.frame_count == 0, "bad H.265 frame count");
     require(analysis.summary.slices.total == 0, "bad H.265 parsed slice count");
+    require(analysis.summary.parse_errors.total == 4, "bad H.265 parse error total");
+    require(analysis.summary.parse_errors.vps == 1, "bad H.265 VPS parse errors");
+    require(analysis.summary.parse_errors.sps == 1, "bad H.265 SPS parse errors");
+    require(analysis.summary.parse_errors.pps == 1, "bad H.265 PPS parse errors");
+    require(analysis.summary.parse_errors.slice == 1, "bad H.265 slice parse errors");
     require(!analysis.summary.active_h265_sps.has_value(), "bad H.265 active SPS absent");
     require(analysis.nals[0].h265.has_value(), "bad H.265 VPS analysis present");
     require(analysis.nals[0].h265->vps_parse_error.has_value(), "bad H.265 VPS error");

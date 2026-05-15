@@ -66,5 +66,6 @@ sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
 ./build/apps/streamview-cli/streamview analyze samples/example.h264 --json out.json
 ```
 
-Without `--json`, the CLI prints a concise text summary. With `--json`, it
-writes the full NAL/frame/GOP analysis model to the selected file.
+Without `--json`, the CLI prints a concise text summary, including parse error
+counts. With `--json`, it writes the full NAL/frame/GOP analysis model to the
+selected file.

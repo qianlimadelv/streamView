@@ -29,6 +29,14 @@ struct SliceStats {
     std::size_t si{};
 };
 
+struct ParseErrorStats {
+    std::size_t total{};
+    std::size_t vps{};
+    std::size_t sps{};
+    std::size_t pps{};
+    std::size_t slice{};
+};
+
 struct StreamSummary {
     std::optional<bitstream::H264SpsInfo> active_sps;
     std::optional<bitstream::H265VpsInfo> active_h265_vps;
@@ -40,6 +48,7 @@ struct StreamSummary {
     std::size_t keyframe_count{};
     std::size_t gop_count{};
     SliceStats slices;
+    ParseErrorStats parse_errors;
 };
 
 struct H264NalAnalysis {

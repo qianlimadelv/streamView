@@ -120,6 +120,11 @@ void write_text_summary(std::ostream& out, const streamview::analysis::StreamAna
         << ", B=" << analysis.summary.slices.b
         << ", SP=" << analysis.summary.slices.sp
         << ", SI=" << analysis.summary.slices.si << "\n";
+    out << "Parse errors: total=" << analysis.summary.parse_errors.total
+        << ", VPS=" << analysis.summary.parse_errors.vps
+        << ", SPS=" << analysis.summary.parse_errors.sps
+        << ", PPS=" << analysis.summary.parse_errors.pps
+        << ", slice=" << analysis.summary.parse_errors.slice << "\n";
 }
 
 int write_json_output(const AnalyzeOptions& options, const streamview::analysis::StreamAnalysis& analysis) {

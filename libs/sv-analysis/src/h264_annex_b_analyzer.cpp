@@ -27,6 +27,11 @@ void add_slice_to_summary(StreamSummary& summary, bitstream::H264SliceKind kind)
     }
 }
 
+void add_parse_error(StreamSummary& summary, std::size_t ParseErrorStats::*field) {
+    ++summary.parse_errors.total;
+    ++(summary.parse_errors.*field);
+}
+
 std::string h264_frame_type_name(bitstream::H264SliceKind kind) {
     return std::string(bitstream::h264_slice_kind_name(kind));
 }
@@ -84,6 +89,7 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
                 analysis.summary.active_sps = *sps.info;
             } else {
                 nal.h264->sps_parse_error = sps.status.message();
+                add_parse_error(analysis.summary, &ParseErrorStats::sps);
             }
         } else if (nal.h264->header.nal_unit_type == bitstream::H264NalType::Pps) {
             ++analysis.summary.pps_count;
@@ -92,6 +98,7 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
                 nal.h264->pps = *pps.info;
             } else {
                 nal.h264->pps_parse_error = pps.status.message();
+                add_parse_error(analysis.summary, &ParseErrorStats::pps);
             }
         } else if (nal.h264->header.nal_unit_type == bitstream::H264NalType::CodedSliceNonIdr ||
                    nal.h264->header.nal_unit_type == bitstream::H264NalType::CodedSliceIdr) {
@@ -105,9 +112,11 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
                     add_h264_frame(analysis, nal);
                 } else {
                     nal.h264->slice_parse_error = slice.status.message();
+                    add_parse_error(analysis.summary, &ParseErrorStats::slice);
                 }
             } else {
                 nal.h264->slice_parse_error = "missing active SPS";
+                add_parse_error(analysis.summary, &ParseErrorStats::slice);
             }
         }
 

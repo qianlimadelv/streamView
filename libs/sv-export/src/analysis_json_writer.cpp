@@ -23,6 +23,13 @@ void write_stream_summary_json(std::ostream& out, const analysis::StreamSummary&
     out << "      \"B\": " << summary.slices.b << ",\n";
     out << "      \"SP\": " << summary.slices.sp << ",\n";
     out << "      \"SI\": " << summary.slices.si << "\n";
+    out << "    },\n";
+    out << "    \"parse_errors\": {\n";
+    out << "      \"total\": " << summary.parse_errors.total << ",\n";
+    out << "      \"vps\": " << summary.parse_errors.vps << ",\n";
+    out << "      \"sps\": " << summary.parse_errors.sps << ",\n";
+    out << "      \"pps\": " << summary.parse_errors.pps << ",\n";
+    out << "      \"slice\": " << summary.parse_errors.slice << "\n";
     out << "    }";
 
     if (summary.active_sps.has_value()) {

@@ -11,3 +11,4 @@ Parameter sets: VPS=1, SPS=1, PPS=1
 Resolution: 640x360
 Profile/level: 1/120
 Slices: total=1, I=1, P=0, B=0, SP=0, SI=0
+Parse errors: total=0, VPS=0, SPS=0, PPS=0, slice=0
