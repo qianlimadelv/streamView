@@ -57,6 +57,38 @@ set_tests_properties(streamview-cli-invalid-limit-nals
 )
 
 add_test(
+    NAME streamview-cli-invalid-format
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_CASE=invalid-format
+        -DSTREAMVIEW_EXPECTED_ERROR=--format\ must\ be\ text\ or\ json
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_invalid_args_test.cmake
+)
+
+set_tests_properties(streamview-cli-invalid-format
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-invalid-codec
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_CASE=invalid-codec
+        -DSTREAMVIEW_EXPECTED_ERROR=--codec\ must\ be\ auto,\ h264,\ or\ h265
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_invalid_args_test.cmake
+)
+
+set_tests_properties(streamview-cli-invalid-codec
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
     NAME streamview-cli-golden-h264-minimal
     COMMAND
         ${CMAKE_COMMAND}
@@ -175,6 +207,38 @@ set_tests_properties(streamview-cli-errors-h264-clean
 )
 
 add_test(
+    NAME streamview-cli-errors-h264-json-clean
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_errors.actual.json
+        -DSTREAMVIEW_ERRORS_JSON=1
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_errors_test.cmake
+)
+
+set_tests_properties(streamview-cli-errors-h264-json-clean
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-json-stdout-h264-minimal
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_EXPECTED_CODEC=h264
+        -DSTREAMVIEW_CODEC=h264
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_stdout_json_test.cmake
+)
+
+set_tests_properties(streamview-cli-json-stdout-h264-minimal
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
     NAME streamview-cli-summary-h264-minimal
     COMMAND
         ${CMAKE_COMMAND}
@@ -235,6 +299,22 @@ add_test(
 )
 
 set_tests_properties(streamview-cli-summary-h265-minimal
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-json-stdout-h265-minimal
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h265/minimal_vps_sps_pps_idr.h265
+        -DSTREAMVIEW_EXPECTED_CODEC=h265
+        -DSTREAMVIEW_CODEC=h265
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_stdout_json_test.cmake
+)
+
+set_tests_properties(streamview-cli-json-stdout-h265-minimal
     PROPERTIES
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )

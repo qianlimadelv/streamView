@@ -21,6 +21,7 @@ product and engineering boundaries.
 - `docs/PRD_CN.md`
 - `docs/ARCHITECTURE_CN.md`
 - `docs/CODEC-SCOPE_CN.md`
+- `docs/CLI_CN.md`
 - `docs/ROADMAP_CN.md`
 - `AGENTS_CN.md`
 
@@ -66,10 +67,13 @@ sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
 ./build/apps/streamview-cli/streamview analyze samples/example.h264 --json out.json
 ./build/apps/streamview-cli/streamview analyze samples/example.h264 --json summary.json --json-mode summary
 ./build/apps/streamview-cli/streamview analyze samples/example.h264 --json first-nals.json --limit-nals 100
+./build/apps/streamview-cli/streamview analyze samples/example.h265 --codec h265 --format json --output -
+./build/apps/streamview-cli/streamview analyze samples/example.h264 --format text --output summary.txt
 ./build/apps/streamview-cli/streamview inspect samples/example.h264 --nal 0
 ./build/apps/streamview-cli/streamview inspect samples/example.h264 --frame 0
 ./build/apps/streamview-cli/streamview inspect samples/example.h264 --gop 0
 ./build/apps/streamview-cli/streamview errors samples/example.h264
+./build/apps/streamview-cli/streamview errors samples/example.h264 --json
 ```
 
 Without `--json`, the CLI prints a concise text summary, including parse error
@@ -78,3 +82,20 @@ selected file. Use `--json-mode summary` for large streams when only the top
 level summary is needed. Use `--limit-nals` when only the first N NAL details
 are needed in full JSON. Use `inspect` to print one NAL/frame/GOP directly.
 Use `errors` to list parse failures quickly.
+
+The newer output options are:
+
+- `--format text|json`: choose stdout/file output format.
+- `--output <path|->`: write to a file, or use `-` for stdout.
+- `--codec auto|h264|h265`: override codec detection when extension-based auto
+  detection is not enough.
+
+`--json <path>` is kept as a compatibility alias for `--format json --output
+<path>`.
+
+Exit codes:
+
+- `0`: command succeeded; `errors` found no parse errors.
+- `1`: invalid command line usage.
+- `2`: input, output, analysis, or inspect lookup failed.
+- `3`: `errors` command completed and found parse errors.

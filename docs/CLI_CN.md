@@ -1,0 +1,41 @@
+# StreamView CLI
+
+当前 CLI 是 GUI 层之前的 MVP 入口，目标是先把码流分析、结构化导出、局部
+对象检查和错误排查做成可测试、可脚本化的工具链。
+
+## 命令
+
+```bash
+streamview analyze <input> [--format text|json] [--output <path|->] [--codec auto|h264|h265]
+                   [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]
+streamview inspect <input> --nal <index>|--frame <index>|--gop <index>
+streamview errors <input> [--json]
+```
+
+## Analyze
+
+- 默认输出为 stdout 上的文本摘要。
+- `--format json --output -` 会把 JSON 打到 stdout。
+- `--output <path>` 会把当前选择的格式写入文件。
+- `--json <path>` 作为兼容写法保留，等价于 `--format json --output <path>`。
+- `--json-mode summary` 只输出顶层摘要，适合大码流快速统计。
+- `--limit-nals <count>` 可以截断 full JSON 中的 NAL 明细，避免输出过大。
+- `--codec auto|h264|h265` 用于覆盖基于扩展名的自动识别。
+
+## Inspect
+
+`inspect` 输出单个 NAL、frame 或 GOP 的 JSON。NAL inspect 会尽量输出当前已解析
+的 codec syntax 字段、parse error 文本以及引用该 NAL 的 frame 索引。Frame
+inspect 会输出所属 GOP 索引。
+
+## Errors
+
+`errors` 只输出 parser 失败项，适合快速判断真实码流是否存在当前解析器能识别
+的问题。脚本场景建议使用 `--json`。
+
+## 退出码
+
+- `0`: 命令成功；`errors` 没有发现 parse error。
+- `1`: 命令行参数错误。
+- `2`: 输入、输出、分析流程或 inspect 查询失败。
+- `3`: `errors` 命令执行成功，但发现 parse error。

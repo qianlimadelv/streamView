@@ -25,6 +25,20 @@ elseif(STREAMVIEW_CASE STREQUAL "invalid-limit-nals")
         OUTPUT_VARIABLE stdout
         ERROR_VARIABLE stderr
     )
+elseif(STREAMVIEW_CASE STREQUAL "invalid-format")
+    execute_process(
+        COMMAND ${STREAMVIEW_CLI} analyze ${STREAMVIEW_SAMPLE} --format yaml
+        RESULT_VARIABLE result
+        OUTPUT_VARIABLE stdout
+        ERROR_VARIABLE stderr
+    )
+elseif(STREAMVIEW_CASE STREQUAL "invalid-codec")
+    execute_process(
+        COMMAND ${STREAMVIEW_CLI} analyze ${STREAMVIEW_SAMPLE} --codec av1
+        RESULT_VARIABLE result
+        OUTPUT_VARIABLE stdout
+        ERROR_VARIABLE stderr
+    )
 else()
     message(FATAL_ERROR "Unknown invalid args test case: ${STREAMVIEW_CASE}")
 endif()

@@ -18,11 +18,24 @@
 
 namespace {
 
+enum class OutputFormat {
+    Text,
+    Json,
+};
+
+enum class CodecOverride {
+    Auto,
+    H264,
+    H265,
+};
+
 struct AnalyzeOptions {
     std::string input_path;
-    std::optional<std::string> json_output_path;
+    OutputFormat output_format{OutputFormat::Text};
+    std::optional<std::string> output_path;
     streamview::exporter::AnalysisJsonMode json_mode{streamview::exporter::AnalysisJsonMode::Full};
     std::optional<std::size_t> nal_limit;
+    CodecOverride codec{CodecOverride::Auto};
 };
 
 struct ParseAnalyzeArgsResult {
@@ -54,7 +67,8 @@ struct ParseErrorsArgsResult {
 
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
-        << "  streamview analyze <input.h264> [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
+        << "  streamview analyze <input> [--format text|json] [--output <path|->] [--codec auto|h264|h265]\n"
+        << "                    [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
         << "  streamview inspect <input.h264> --nal <index>|--frame <index>|--gop <index>\n"
         << "  streamview errors <input.h264> [--json]\n"
         << "  streamview --help\n";
@@ -66,6 +80,29 @@ std::optional<streamview::exporter::AnalysisJsonMode> parse_json_mode(std::strin
     }
     if (value == "summary") {
         return streamview::exporter::AnalysisJsonMode::Summary;
+    }
+    return std::nullopt;
+}
+
+std::optional<OutputFormat> parse_output_format(std::string_view value) {
+    if (value == "text") {
+        return OutputFormat::Text;
+    }
+    if (value == "json") {
+        return OutputFormat::Json;
+    }
+    return std::nullopt;
+}
+
+std::optional<CodecOverride> parse_codec_override(std::string_view value) {
+    if (value == "auto") {
+        return CodecOverride::Auto;
+    }
+    if (value == "h264") {
+        return CodecOverride::H264;
+    }
+    if (value == "h265") {
+        return CodecOverride::H265;
     }
     return std::nullopt;
 }
@@ -93,7 +130,31 @@ ParseAnalyzeArgsResult parse_analyze_args(int argc, char** argv) {
             if (i + 1 >= argc) {
                 return {.error = "--json requires an output path"};
             }
-            options.json_output_path = argv[++i];
+            options.output_format = OutputFormat::Json;
+            options.output_path = argv[++i];
+        } else if (arg == "--format") {
+            if (i + 1 >= argc) {
+                return {.error = "--format requires text or json"};
+            }
+            const auto format = parse_output_format(argv[++i]);
+            if (!format.has_value()) {
+                return {.error = "--format must be text or json"};
+            }
+            options.output_format = *format;
+        } else if (arg == "--output") {
+            if (i + 1 >= argc) {
+                return {.error = "--output requires a path or -"};
+            }
+            options.output_path = argv[++i];
+        } else if (arg == "--codec") {
+            if (i + 1 >= argc) {
+                return {.error = "--codec requires auto, h264, or h265"};
+            }
+            const auto codec = parse_codec_override(argv[++i]);
+            if (!codec.has_value()) {
+                return {.error = "--codec must be auto, h264, or h265"};
+            }
+            options.codec = *codec;
         } else if (arg == "--json-mode") {
             if (i + 1 >= argc) {
                 return {.error = "--json-mode requires full or summary"};
@@ -228,14 +289,25 @@ std::optional<std::vector<std::uint8_t>> load_input_as_annex_b(const std::string
     return read_file(path);
 }
 
-std::optional<streamview::analysis::StreamAnalysis> analyze_input(const std::string& input_path) {
+bool should_analyze_h265(const std::string& input_path, CodecOverride codec) {
+    if (codec == CodecOverride::H265) {
+        return true;
+    }
+    if (codec == CodecOverride::H264) {
+        return false;
+    }
+    return is_h265_input(input_path);
+}
+
+std::optional<streamview::analysis::StreamAnalysis> analyze_input(const std::string& input_path,
+                                                                  CodecOverride codec = CodecOverride::Auto) {
     const auto data = load_input_as_annex_b(input_path);
     if (!data.has_value()) {
         std::cerr << "streamview: failed to read input file: " << input_path << "\n";
         return std::nullopt;
     }
 
-    if (is_h265_input(input_path)) {
+    if (should_analyze_h265(input_path, codec)) {
         return streamview::analysis::analyze_h265_annex_b(input_path, *data);
     }
     return streamview::analysis::analyze_h264_annex_b(input_path, *data);
@@ -283,15 +355,21 @@ void write_text_summary(std::ostream& out, const streamview::analysis::StreamAna
         << ", slice=" << analysis.summary.parse_errors.slice << "\n";
 }
 
-int write_json_output(const AnalyzeOptions& options, const streamview::analysis::StreamAnalysis& analysis) {
-    if (options.json_output_path.has_value()) {
-        std::ofstream output(*options.json_output_path, std::ios::binary);
-        if (!output) {
-            std::cerr << "streamview: failed to open JSON output file: " << *options.json_output_path << "\n";
+int write_analyze_output(const AnalyzeOptions& options, const streamview::analysis::StreamAnalysis& analysis) {
+    std::ofstream file_output;
+    std::ostream* output = &std::cout;
+    if (options.output_path.has_value() && *options.output_path != "-") {
+        file_output.open(*options.output_path, std::ios::binary);
+        output = &file_output;
+        if (!file_output) {
+            std::cerr << "streamview: failed to open output file: " << *options.output_path << "\n";
             return 2;
         }
+    }
+
+    if (options.output_format == OutputFormat::Json) {
         streamview::exporter::write_analysis_json(
-            output,
+            *output,
             analysis,
             streamview::exporter::AnalysisJsonOptions{
                 .mode = options.json_mode,
@@ -300,23 +378,59 @@ int write_json_output(const AnalyzeOptions& options, const streamview::analysis:
         return 0;
     }
 
-    write_text_summary(std::cout, analysis);
+    write_text_summary(*output, analysis);
     return 0;
 }
 
 int run_analyze(const AnalyzeOptions& options) {
-    const auto analysis = analyze_input(options.input_path);
+    const auto analysis = analyze_input(options.input_path, options.codec);
     if (!analysis.has_value()) {
         return 2;
     }
 
-    return write_json_output(options, *analysis);
+    return write_analyze_output(options, *analysis);
+}
+
+std::optional<std::string> nal_parse_error_message(const streamview::analysis::NalAnalysis& nal);
+
+std::vector<std::size_t> find_frame_indices_for_nal(const streamview::analysis::StreamAnalysis& analysis,
+                                                    std::size_t nal_index) {
+    std::vector<std::size_t> frame_indices;
+    for (const auto& frame : analysis.frames) {
+        for (const auto frame_nal_index : frame.nal_indices) {
+            if (frame_nal_index == nal_index) {
+                frame_indices.push_back(frame.index);
+                break;
+            }
+        }
+    }
+    return frame_indices;
+}
+
+std::optional<std::size_t> find_gop_index_for_frame(const streamview::analysis::StreamAnalysis& analysis,
+                                                    std::size_t frame_index) {
+    for (const auto& gop : analysis.gops) {
+        if (frame_index >= gop.start_frame_index && frame_index <= gop.end_frame_index) {
+            return gop.index;
+        }
+    }
+    return std::nullopt;
+}
+
+void write_size_array(std::ostream& out, const std::vector<std::size_t>& values) {
+    out << "[";
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        out << values[i] << (i + 1 == values.size() ? "" : ", ");
+    }
+    out << "]";
 }
 
 void write_nal_inspect_json(std::ostream& out,
                             const streamview::analysis::StreamAnalysis& analysis,
                             std::size_t nal_index) {
     const auto& nal = analysis.nals[nal_index];
+    const auto frame_indices = find_frame_indices_for_nal(analysis, nal_index);
+    const auto parse_error = nal_parse_error_message(nal);
     out << "{\n";
     out << "  \"input\": ";
     streamview::exporter::write_json_string(out, analysis.input_path);
@@ -330,7 +444,14 @@ void write_nal_inspect_json(std::ostream& out,
     out << "    \"start_code_offset\": " << nal.unit.start_code_offset << ",\n";
     out << "    \"start_code_size\": " << nal.unit.start_code_size << ",\n";
     out << "    \"payload_offset\": " << nal.unit.payload_offset << ",\n";
-    out << "    \"payload_size\": " << nal.unit.payload_size;
+    out << "    \"payload_size\": " << nal.unit.payload_size << ",\n";
+    out << "    \"frame_indices\": ";
+    write_size_array(out, frame_indices);
+    if (parse_error.has_value()) {
+        out << ",\n";
+        out << "    \"parse_error\": ";
+        streamview::exporter::write_json_string(out, *parse_error);
+    }
 
     if (nal.h264.has_value()) {
         out << ",\n";
@@ -340,13 +461,24 @@ void write_nal_inspect_json(std::ostream& out,
         streamview::exporter::write_json_string(out, streamview::bitstream::h264_nal_type_name(nal.h264->header.nal_unit_type));
         if (nal.h264->sps.has_value()) {
             out << ",\n";
+            out << "    \"profile_idc\": " << static_cast<int>(nal.h264->sps->profile_idc) << ",\n";
+            out << "    \"level_idc\": " << static_cast<int>(nal.h264->sps->level_idc) << ",\n";
+            out << "    \"seq_parameter_set_id\": " << nal.h264->sps->seq_parameter_set_id << ",\n";
             out << "    \"width\": " << nal.h264->sps->width << ",\n";
             out << "    \"height\": " << nal.h264->sps->height;
+        } else if (nal.h264->pps.has_value()) {
+            out << ",\n";
+            out << "    \"pic_parameter_set_id\": " << nal.h264->pps->pic_parameter_set_id << ",\n";
+            out << "    \"seq_parameter_set_id\": " << nal.h264->pps->seq_parameter_set_id << ",\n";
+            out << "    \"entropy_coding_mode_flag\": "
+                << (nal.h264->pps->entropy_coding_mode_flag ? "true" : "false");
         } else if (nal.h264->slice.has_value()) {
             out << ",\n";
             out << "    \"slice_type\": ";
             streamview::exporter::write_json_string(out, streamview::bitstream::h264_slice_kind_name(nal.h264->slice->slice_kind));
             out << ",\n";
+            out << "    \"slice_type_raw\": " << nal.h264->slice->slice_type_raw << ",\n";
+            out << "    \"pic_parameter_set_id\": " << nal.h264->slice->pic_parameter_set_id << ",\n";
             out << "    \"frame_num\": " << nal.h264->slice->frame_num;
         }
     } else if (nal.h265.has_value()) {
@@ -355,10 +487,24 @@ void write_nal_inspect_json(std::ostream& out,
         out << "    \"nal_unit_type\": " << static_cast<int>(nal.h265->header.nal_unit_type) << ",\n";
         out << "    \"nal_unit_type_name\": ";
         streamview::exporter::write_json_string(out, streamview::bitstream::h265_nal_type_name(nal.h265->header.nal_unit_type));
-        if (nal.h265->sps.has_value()) {
+        if (nal.h265->vps.has_value()) {
             out << ",\n";
+            out << "    \"profile_idc\": " << static_cast<int>(nal.h265->vps->profile_idc) << ",\n";
+            out << "    \"level_idc\": " << static_cast<int>(nal.h265->vps->level_idc) << ",\n";
+            out << "    \"video_parameter_set_id\": " << nal.h265->vps->video_parameter_set_id;
+        } else if (nal.h265->sps.has_value()) {
+            out << ",\n";
+            out << "    \"profile_idc\": " << static_cast<int>(nal.h265->sps->profile_idc) << ",\n";
+            out << "    \"level_idc\": " << static_cast<int>(nal.h265->sps->level_idc) << ",\n";
+            out << "    \"video_parameter_set_id\": " << nal.h265->sps->video_parameter_set_id << ",\n";
+            out << "    \"seq_parameter_set_id\": " << nal.h265->sps->seq_parameter_set_id << ",\n";
             out << "    \"width\": " << nal.h265->sps->width << ",\n";
             out << "    \"height\": " << nal.h265->sps->height;
+        } else if (nal.h265->pps.has_value()) {
+            out << ",\n";
+            out << "    \"pic_parameter_set_id\": " << nal.h265->pps->pic_parameter_set_id << ",\n";
+            out << "    \"seq_parameter_set_id\": " << nal.h265->pps->seq_parameter_set_id << ",\n";
+            out << "    \"num_extra_slice_header_bits\": " << static_cast<int>(nal.h265->pps->num_extra_slice_header_bits);
         } else if (nal.h265->slice.has_value()) {
             out << ",\n";
             out << "    \"slice_pic_parameter_set_id\": " << nal.h265->slice->slice_pic_parameter_set_id;
@@ -379,6 +525,7 @@ void write_frame_inspect_json(std::ostream& out,
                               const streamview::analysis::StreamAnalysis& analysis,
                               std::size_t frame_index) {
     const auto& frame = analysis.frames[frame_index];
+    const auto gop_index = find_gop_index_for_frame(analysis, frame_index);
     out << "{\n";
     out << "  \"input\": ";
     streamview::exporter::write_json_string(out, analysis.input_path);
@@ -398,6 +545,13 @@ void write_frame_inspect_json(std::ostream& out,
     out << "    \"is_keyframe\": " << (frame.is_keyframe ? "true" : "false") << ",\n";
     out << "    \"size_bytes\": " << frame.size_bytes << ",\n";
     out << "    \"first_payload_offset\": " << frame.first_payload_offset << ",\n";
+    out << "    \"gop_index\": ";
+    if (gop_index.has_value()) {
+        out << *gop_index;
+    } else {
+        out << "null";
+    }
+    out << ",\n";
     out << "    \"nal_indices\": [";
     for (std::size_t i = 0; i < frame.nal_indices.size(); ++i) {
         out << frame.nal_indices[i] << (i + 1 == frame.nal_indices.size() ? "" : ", ");
