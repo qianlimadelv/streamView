@@ -38,7 +38,8 @@ inspect 会输出所属 GOP 索引。
 ## Validate
 
 `validate` 基于分析模型执行轻量结构检查。当前会报告 parser 错误、空 Annex B
-输入、缺失 frame/keyframe、缺失参数集等问题。CI 或脚本场景建议使用 `--json`。
+输入、缺失 frame/keyframe、缺失参数集，以及重复的 SPS/PPS/VPS id 等问题。CI
+或脚本场景建议使用 `--json`。
 
 ## Dump
 

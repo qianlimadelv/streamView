@@ -1,5 +1,7 @@
 #include "streamview/analysis/stream_analysis.hpp"
+#include "streamview/analysis/validation.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -305,6 +307,46 @@ void test_analyzes_h265_frame_poc_from_context() {
     require(analysis.frames[0].poc.value() == 5, "H.265 POC frame poc");
 }
 
+void test_validates_duplicate_h264_parameter_sets() {
+    auto stream = make_minimal_h264_stream();
+    const auto duplicate = stream;
+    stream.insert(stream.end(), duplicate.begin(), duplicate.end());
+
+    const auto analysis = streamview::analysis::analyze_h264_annex_b("dup.h264", stream);
+    const auto issues = streamview::analysis::validate_stream_analysis(analysis);
+
+    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "duplicate_h264_sps_id" && issue.severity == "warning";
+            }),
+            "H.264 duplicate SPS validation issue");
+    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "duplicate_h264_pps_id" && issue.severity == "warning";
+            }),
+            "H.264 duplicate PPS validation issue");
+}
+
+void test_validates_duplicate_h265_parameter_sets() {
+    auto stream = make_minimal_h265_stream();
+    const auto duplicate = stream;
+    stream.insert(stream.end(), duplicate.begin(), duplicate.end());
+
+    const auto analysis = streamview::analysis::analyze_h265_annex_b("dup.h265", stream);
+    const auto issues = streamview::analysis::validate_stream_analysis(analysis);
+
+    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "duplicate_h265_vps_id" && issue.severity == "warning";
+            }),
+            "H.265 duplicate VPS validation issue");
+    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "duplicate_h265_sps_id" && issue.severity == "warning";
+            }),
+            "H.265 duplicate SPS validation issue");
+    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "duplicate_h265_pps_id" && issue.severity == "warning";
+            }),
+            "H.265 duplicate PPS validation issue");
+}
+
 void test_records_h264_parse_errors_without_frames() {
     const std::vector<std::uint8_t> stream{
         0x00, 0x00, 0x01,
@@ -373,6 +415,8 @@ int main() {
     test_analyzes_h264_frame_poc_from_context();
     test_analyzes_minimal_h265_stream();
     test_analyzes_h265_frame_poc_from_context();
+    test_validates_duplicate_h264_parameter_sets();
+    test_validates_duplicate_h265_parameter_sets();
     test_records_h264_parse_errors_without_frames();
     test_records_h265_parse_errors_without_crashing();
     return 0;

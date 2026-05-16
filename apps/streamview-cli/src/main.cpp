@@ -1,4 +1,5 @@
 #include "streamview/analysis/stream_analysis.hpp"
+#include "streamview/analysis/validation.hpp"
 #include "streamview/bitstream/rbsp.hpp"
 #include "streamview/export/analysis_json_writer.hpp"
 #include "streamview/export/json_writer.hpp"
@@ -19,12 +20,13 @@
 #include <optional>
 #include <filesystem>
 #include <charconv>
-#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace {
+
+using streamview::analysis::ValidationIssue;
 
 enum class OutputFormat {
     Text,
@@ -87,12 +89,6 @@ struct ValidateOptions {
 struct ParseValidateArgsResult {
     std::optional<ValidateOptions> options;
     std::string error;
-};
-
-struct ValidationIssue {
-    std::string severity;
-    std::string code;
-    std::string message;
 };
 
 struct DumpOptions {
@@ -862,149 +858,7 @@ int run_errors(const ErrorsOptions& options) {
 }
 
 std::vector<ValidationIssue> validate_analysis(const streamview::analysis::StreamAnalysis& analysis) {
-    std::vector<ValidationIssue> issues;
-    std::set<std::uint32_t> h264_sps_ids;
-    std::set<std::uint32_t> h264_pps_ids;
-    std::set<std::uint32_t> h265_vps_ids;
-    std::set<std::uint32_t> h265_sps_ids;
-    std::set<std::uint32_t> h265_pps_ids;
-
-    for (const auto& nal : analysis.nals) {
-        if (nal.h264.has_value()) {
-            if (nal.h264->sps.has_value()) {
-                h264_sps_ids.insert(nal.h264->sps->seq_parameter_set_id);
-            }
-            if (nal.h264->pps.has_value()) {
-                h264_pps_ids.insert(nal.h264->pps->pic_parameter_set_id);
-            }
-        }
-        if (nal.h265.has_value()) {
-            if (nal.h265->vps.has_value()) {
-                h265_vps_ids.insert(nal.h265->vps->video_parameter_set_id);
-            }
-            if (nal.h265->sps.has_value()) {
-                h265_sps_ids.insert(nal.h265->sps->seq_parameter_set_id);
-            }
-            if (nal.h265->pps.has_value()) {
-                h265_pps_ids.insert(nal.h265->pps->pic_parameter_set_id);
-            }
-        }
-    }
-
-    if (analysis.summary.parse_errors.total > 0) {
-        issues.push_back({
-            .severity = "error",
-            .code = "parse_errors",
-            .message = "bitstream contains parser errors",
-        });
-    }
-    if (analysis.nals.empty()) {
-        issues.push_back({
-            .severity = "error",
-            .code = "no_nal_units",
-            .message = "input does not contain Annex B NAL units",
-        });
-        return issues;
-    }
-    if (analysis.summary.frame_count == 0) {
-        issues.push_back({
-            .severity = "warning",
-            .code = "no_frames",
-            .message = "no coded frames were identified",
-        });
-    }
-    if (analysis.summary.keyframe_count == 0) {
-        issues.push_back({
-            .severity = "warning",
-            .code = "no_keyframes",
-            .message = "no keyframes were identified",
-        });
-    }
-    if (analysis.codec_guess == "h264" && analysis.summary.sps_count == 0) {
-        issues.push_back({
-            .severity = "warning",
-            .code = "missing_h264_sps",
-            .message = "H.264 stream has no parsed SPS",
-        });
-    }
-    if (analysis.codec_guess == "h264" && analysis.summary.pps_count == 0) {
-        issues.push_back({
-            .severity = "warning",
-            .code = "missing_h264_pps",
-            .message = "H.264 stream has no parsed PPS",
-        });
-    }
-    for (const auto& nal : analysis.nals) {
-        if (!nal.h264.has_value()) {
-            continue;
-        }
-        if (nal.h264->pps.has_value() && h264_sps_ids.find(nal.h264->pps->seq_parameter_set_id) == h264_sps_ids.end()) {
-            issues.push_back({
-                .severity = "error",
-                .code = "h264_pps_references_missing_sps",
-                .message = "H.264 PPS references an SPS id that was not parsed",
-            });
-        }
-        if (nal.h264->slice.has_value() &&
-            h264_pps_ids.find(nal.h264->slice->pic_parameter_set_id) == h264_pps_ids.end()) {
-            issues.push_back({
-                .severity = "error",
-                .code = "h264_slice_references_missing_pps",
-                .message = "H.264 slice references a PPS id that was not parsed",
-            });
-        }
-    }
-    if (analysis.codec_guess == "h265" && analysis.summary.vps_count == 0) {
-        issues.push_back({
-            .severity = "warning",
-            .code = "missing_h265_vps",
-            .message = "H.265 stream has no parsed VPS",
-        });
-    }
-    if (analysis.codec_guess == "h265" && analysis.summary.sps_count == 0) {
-        issues.push_back({
-            .severity = "warning",
-            .code = "missing_h265_sps",
-            .message = "H.265 stream has no parsed SPS",
-        });
-    }
-    if (analysis.codec_guess == "h265" && analysis.summary.pps_count == 0) {
-        issues.push_back({
-            .severity = "warning",
-            .code = "missing_h265_pps",
-            .message = "H.265 stream has no parsed PPS",
-        });
-    }
-    for (const auto& nal : analysis.nals) {
-        if (!nal.h265.has_value()) {
-            continue;
-        }
-        if (nal.h265->sps.has_value() &&
-            h265_vps_ids.find(nal.h265->sps->video_parameter_set_id) == h265_vps_ids.end()) {
-            issues.push_back({
-                .severity = "error",
-                .code = "h265_sps_references_missing_vps",
-                .message = "H.265 SPS references a VPS id that was not parsed",
-            });
-        }
-        if (nal.h265->pps.has_value() &&
-            h265_sps_ids.find(nal.h265->pps->seq_parameter_set_id) == h265_sps_ids.end()) {
-            issues.push_back({
-                .severity = "error",
-                .code = "h265_pps_references_missing_sps",
-                .message = "H.265 PPS references an SPS id that was not parsed",
-            });
-        }
-        if (nal.h265->slice.has_value() &&
-            h265_pps_ids.find(nal.h265->slice->slice_pic_parameter_set_id) == h265_pps_ids.end()) {
-            issues.push_back({
-                .severity = "error",
-                .code = "h265_slice_references_missing_pps",
-                .message = "H.265 slice references a PPS id that was not parsed",
-            });
-        }
-    }
-    return issues;
+    return streamview::analysis::validate_stream_analysis(analysis);
 }
 
 bool has_validation_errors(const std::vector<ValidationIssue>& issues) {
