@@ -1,5 +1,6 @@
 #include "streamview/analysis/stream_analysis.hpp"
 
+#include <map>
 #include <string>
 #include <utility>
 
@@ -71,6 +72,8 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
 
     const auto units = bitstream::scan_annex_b(data);
     analysis.nals.reserve(units.size());
+    std::map<std::uint32_t, bitstream::H264SpsInfo> sps_by_id;
+    std::map<std::uint32_t, bitstream::H264PpsInfo> pps_by_id;
 
     for (std::size_t i = 0; i < units.size(); ++i) {
         const auto& unit = units[i];
@@ -86,6 +89,7 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
             const auto sps = bitstream::parse_h264_sps(payload);
             if (sps.status.is_ok() && sps.info.has_value()) {
                 nal.h264->sps = *sps.info;
+                sps_by_id[sps.info->seq_parameter_set_id] = *sps.info;
                 analysis.summary.active_sps = *sps.info;
             } else {
                 nal.h264->sps_parse_error = sps.status.message();
@@ -96,6 +100,7 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
             const auto pps = bitstream::parse_h264_pps(payload);
             if (pps.status.is_ok() && pps.info.has_value()) {
                 nal.h264->pps = *pps.info;
+                pps_by_id[pps.info->pic_parameter_set_id] = *pps.info;
             } else {
                 nal.h264->pps_parse_error = pps.status.message();
                 add_parse_error(analysis.summary, &ParseErrorStats::pps);
@@ -103,9 +108,40 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
         } else if (nal.h264->header.nal_unit_type == bitstream::H264NalType::CodedSliceNonIdr ||
                    nal.h264->header.nal_unit_type == bitstream::H264NalType::CodedSliceIdr) {
             if (analysis.summary.active_sps.has_value()) {
-                const auto slice = bitstream::parse_h264_slice_header(
+                const auto slice_prefix = bitstream::parse_h264_slice_header(
                     payload,
                     analysis.summary.active_sps->log2_max_frame_num_minus4);
+                auto slice = slice_prefix;
+                if (slice_prefix.status.is_ok() && slice_prefix.info.has_value()) {
+                    const auto pps = pps_by_id.find(slice_prefix.info->pic_parameter_set_id);
+                    if (pps == pps_by_id.end()) {
+                        slice = {
+                            streamview::Status::parse_error("missing referenced PPS"),
+                            std::nullopt,
+                        };
+                    } else {
+                        const auto sps = sps_by_id.find(pps->second.seq_parameter_set_id);
+                        if (sps == sps_by_id.end()) {
+                            slice = {
+                                streamview::Status::parse_error("missing referenced SPS"),
+                                std::nullopt,
+                            };
+                        } else {
+                            slice = bitstream::parse_h264_slice_header(
+                                payload,
+                                bitstream::H264SliceHeaderContext{
+                                    .log2_max_frame_num_minus4 = sps->second.log2_max_frame_num_minus4,
+                                    .frame_mbs_only_flag = sps->second.frame_mbs_only_flag,
+                                    .pic_order_cnt_type = sps->second.pic_order_cnt_type,
+                                    .log2_max_pic_order_cnt_lsb_minus4 =
+                                        sps->second.log2_max_pic_order_cnt_lsb_minus4,
+                                    .bottom_field_pic_order_in_frame_present_flag =
+                                        pps->second.bottom_field_pic_order_in_frame_present_flag,
+                                    .is_idr = nal.h264->header.nal_unit_type == bitstream::H264NalType::CodedSliceIdr,
+                                });
+                        }
+                    }
+                }
                 if (slice.status.is_ok() && slice.info.has_value()) {
                     nal.h264->slice = *slice.info;
                     add_slice_to_summary(analysis.summary, slice.info->slice_kind);

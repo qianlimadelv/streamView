@@ -227,14 +227,20 @@ H264SpsParseResult parse_h264_sps(std::span<const std::uint8_t> nal_payload) {
     if (!pic_order_cnt_type.has_value()) {
         return {Status::parse_error("failed to read pic_order_cnt_type"), std::nullopt};
     }
-    if (*pic_order_cnt_type == 0) {
-        if (!reader.read_ue().has_value()) {
+    info.pic_order_cnt_type = *pic_order_cnt_type;
+    if (info.pic_order_cnt_type == 0) {
+        const auto log2_max_pic_order_cnt_lsb_minus4 = reader.read_ue();
+        if (!log2_max_pic_order_cnt_lsb_minus4.has_value()) {
             return {Status::parse_error("failed to read log2_max_pic_order_cnt_lsb_minus4"), std::nullopt};
         }
-    } else if (*pic_order_cnt_type == 1) {
-        if (!reader.read_bit().has_value() || !reader.read_se().has_value() || !reader.read_se().has_value()) {
+        info.log2_max_pic_order_cnt_lsb_minus4 = *log2_max_pic_order_cnt_lsb_minus4;
+    } else if (info.pic_order_cnt_type == 1) {
+        const auto delta_pic_order_always_zero_flag = reader.read_bit();
+        if (!delta_pic_order_always_zero_flag.has_value() || !reader.read_se().has_value() ||
+            !reader.read_se().has_value()) {
             return {Status::parse_error("failed to read POC type 1 fields"), std::nullopt};
         }
+        info.delta_pic_order_always_zero_flag = *delta_pic_order_always_zero_flag;
         const auto num_ref_frames_in_pic_order_cnt_cycle = reader.read_ue();
         if (!num_ref_frames_in_pic_order_cnt_cycle.has_value()) {
             return {Status::parse_error("failed to read POC cycle count"), std::nullopt};
@@ -244,7 +250,7 @@ H264SpsParseResult parse_h264_sps(std::span<const std::uint8_t> nal_payload) {
                 return {Status::parse_error("failed to read offset_for_ref_frame"), std::nullopt};
             }
         }
-    } else if (*pic_order_cnt_type > 2) {
+    } else if (info.pic_order_cnt_type > 2) {
         return {Status::parse_error("invalid pic_order_cnt_type"), std::nullopt};
     }
 

@@ -79,6 +79,8 @@ void write_sps_json(std::ostream& out, const bitstream::H264SpsInfo& sps) {
     out << "          \"bit_depth_luma\": " << static_cast<int>(sps.bit_depth_luma) << ",\n";
     out << "          \"bit_depth_chroma\": " << static_cast<int>(sps.bit_depth_chroma) << ",\n";
     out << "          \"log2_max_frame_num_minus4\": " << sps.log2_max_frame_num_minus4 << ",\n";
+    out << "          \"pic_order_cnt_type\": " << sps.pic_order_cnt_type << ",\n";
+    out << "          \"log2_max_pic_order_cnt_lsb_minus4\": " << sps.log2_max_pic_order_cnt_lsb_minus4 << ",\n";
     out << "          \"width\": " << sps.width << ",\n";
     out << "          \"height\": " << sps.height << ",\n";
     out << "          \"frame_mbs_only_flag\": " << (sps.frame_mbs_only_flag ? "true" : "false") << ",\n";
@@ -174,7 +176,28 @@ void write_slice_json(std::ostream& out, const bitstream::H264SliceHeaderInfo& s
     out << ",\n";
     out << "          \"slice_type_all_slices\": " << (slice.slice_type_all_slices ? "true" : "false") << ",\n";
     out << "          \"pic_parameter_set_id\": " << slice.pic_parameter_set_id << ",\n";
-    out << "          \"frame_num\": " << slice.frame_num << "\n";
+    out << "          \"frame_num\": " << slice.frame_num;
+    if (slice.field_pic_flag_present) {
+        out << ",\n";
+        out << "          \"field_pic_flag\": " << (slice.field_pic_flag ? "true" : "false");
+    }
+    if (slice.bottom_field_flag_present) {
+        out << ",\n";
+        out << "          \"bottom_field_flag\": " << (slice.bottom_field_flag ? "true" : "false");
+    }
+    if (slice.idr_pic_id_present) {
+        out << ",\n";
+        out << "          \"idr_pic_id\": " << slice.idr_pic_id;
+    }
+    if (slice.pic_order_cnt_lsb_present) {
+        out << ",\n";
+        out << "          \"pic_order_cnt_lsb\": " << slice.pic_order_cnt_lsb;
+    }
+    if (slice.delta_pic_order_cnt_bottom_present) {
+        out << ",\n";
+        out << "          \"delta_pic_order_cnt_bottom\": " << slice.delta_pic_order_cnt_bottom;
+    }
+    out << "\n";
     out << "        }\n";
 }
 

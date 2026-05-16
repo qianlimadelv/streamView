@@ -19,13 +19,22 @@
 - PPS 基础字段
 - 宽高推导
 - Slice header 基础字段
+- SPS POC 基础字段：`pic_order_cnt_type`、`log2_max_pic_order_cnt_lsb_minus4`
+- Slice header 上下文字段：`idr_pic_id`、`pic_order_cnt_lsb`
+- slice 引用 PPS、PPS 引用 SPS 的基础校验
 
 尚未支持：
 
 - SPS/PPS 字段完整解析
 - POC 推导
 - 多 slice 帧聚合
-- 合规性验证
+- 完整合规性验证
+
+标准来源：
+
+- ITU-T H.264 7.3.2.1 Sequence parameter set RBSP syntax
+- ITU-T H.264 7.3.2.3 Picture parameter set RBSP syntax
+- ITU-T H.264 7.3.3 Slice header syntax
 
 ## H.265 Phase 1
 

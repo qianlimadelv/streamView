@@ -236,6 +236,8 @@ void test_parses_h264_sps_dimensions() {
     require(result.info->bit_depth_luma == 8, "SPS bit_depth_luma");
     require(result.info->bit_depth_chroma == 8, "SPS bit_depth_chroma");
     require(result.info->log2_max_frame_num_minus4 == 0, "SPS log2_max_frame_num_minus4");
+    require(result.info->pic_order_cnt_type == 0, "SPS pic_order_cnt_type");
+    require(result.info->log2_max_pic_order_cnt_lsb_minus4 == 2, "SPS log2_max_pic_order_cnt_lsb_minus4");
     require(result.info->width == 640, "SPS width");
     require(result.info->height == 360, "SPS height");
 }
@@ -268,6 +270,37 @@ void test_parses_h264_slice_header_prefix() {
     require(result.info->pic_parameter_set_id == 0, "slice pps id");
     require(result.info->frame_num == 0, "slice frame_num");
     require(streamview::bitstream::h264_slice_kind_name(result.info->slice_kind) == "I", "slice kind name");
+}
+
+void test_parses_h264_slice_header_context_fields() {
+    TestBitWriter writer;
+    writer.write_ue(0);
+    writer.write_ue(7);
+    writer.write_ue(0);
+    writer.write_bits(0, 4);
+    writer.write_ue(2);
+    writer.write_bits(5, 4);
+
+    auto rbsp = writer.finish_rbsp();
+    std::vector<std::uint8_t> slice{0x65};
+    slice.insert(slice.end(), rbsp.begin(), rbsp.end());
+
+    const auto result = streamview::bitstream::parse_h264_slice_header(
+        slice,
+        streamview::bitstream::H264SliceHeaderContext{
+            .log2_max_frame_num_minus4 = 0,
+            .frame_mbs_only_flag = true,
+            .pic_order_cnt_type = 0,
+            .log2_max_pic_order_cnt_lsb_minus4 = 0,
+            .is_idr = true,
+        });
+
+    require(result.status.is_ok(), "context slice parse status");
+    require(result.info.has_value(), "context slice info present");
+    require(result.info->idr_pic_id_present, "context slice idr_pic_id present");
+    require(result.info->idr_pic_id == 2, "context slice idr_pic_id");
+    require(result.info->pic_order_cnt_lsb_present, "context slice POC LSB present");
+    require(result.info->pic_order_cnt_lsb == 5, "context slice POC LSB");
 }
 
 void test_rejects_truncated_h264_parameter_sets_and_slice() {
@@ -402,6 +435,7 @@ int main() {
     test_parses_h264_sps_dimensions();
     test_parses_h264_pps_baseline_fields();
     test_parses_h264_slice_header_prefix();
+    test_parses_h264_slice_header_context_fields();
     test_rejects_truncated_h264_parameter_sets_and_slice();
     test_parses_h265_nal_header();
     test_parses_h265_vps_baseline_fields();

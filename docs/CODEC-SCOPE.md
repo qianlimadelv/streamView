@@ -9,31 +9,46 @@ Supported:
 - H.264 NAL header parsing
 - NAL type names
 
-Not yet supported:
-
-- SPS/PPS field parsing
-- Slice header parsing
-- POC derivation
-- Frame reconstruction
-- Compliance validation
-
 ## H.264 Phase 2
 
-Planned:
+Supported:
 
 - RBSP extraction
 - Exp-Golomb decoding
 - SPS baseline fields
 - PPS baseline fields
 - Width/height derivation
+- Slice header baseline fields
+- SPS POC fields: `pic_order_cnt_type`, `log2_max_pic_order_cnt_lsb_minus4`
+- Contextual slice fields: `idr_pic_id`, `pic_order_cnt_lsb`
+- Basic slice-to-PPS and PPS-to-SPS reference checks
+
+Not yet supported:
+
+- Full SPS/PPS field parsing
+- POC derivation
+- Multi-slice frame aggregation
+- Full compliance validation
+
+Standards:
+
+- ITU-T H.264 7.3.2.1 Sequence parameter set RBSP syntax
+- ITU-T H.264 7.3.2.3 Picture parameter set RBSP syntax
+- ITU-T H.264 7.3.3 Slice header syntax
 
 ## H.265 Phase 1
 
-Planned after H.264 scanner stabilizes:
+Supported:
 
 - Annex B scanning reuse
 - H.265 NAL header parsing
 - VPS/SPS/PPS identification
+- H.265 VPS baseline fields
+- H.265 SPS baseline fields
+- H.265 PPS baseline fields
+- H.265 width/height derivation
+- H.265 slice header prefix fields
+- H.265 slice_type baseline parsing
 
 ## Parser Standards Notes
 
