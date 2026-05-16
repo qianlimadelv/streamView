@@ -16,3 +16,4 @@ if(TARGET StreamView::Demux)
 endif()
 
 target_compile_features(streamview PRIVATE cxx_std_20)
+target_compile_definitions(streamview PRIVATE STREAMVIEW_VERSION="${PROJECT_VERSION}")

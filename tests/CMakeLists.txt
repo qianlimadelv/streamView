@@ -25,6 +25,14 @@ target_compile_features(sv-analysis-tests PRIVATE cxx_std_20)
 add_test(NAME sv-analysis-tests COMMAND sv-analysis-tests)
 
 add_test(
+    NAME streamview-cli-version
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_version_test.cmake
+)
+
+add_test(
     NAME streamview-cli-invalid-json-mode
     COMMAND
         ${CMAKE_COMMAND}

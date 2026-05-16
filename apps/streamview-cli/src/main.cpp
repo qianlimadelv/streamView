@@ -6,6 +6,10 @@
 #include "streamview/demux/ffmpeg_h264_demuxer.hpp"
 #endif
 
+#ifndef STREAMVIEW_VERSION
+#define STREAMVIEW_VERSION "0.0.0"
+#endif
+
 #include <algorithm>
 #include <cstdint>
 #include <iomanip>
@@ -1131,6 +1135,10 @@ int main(int argc, char** argv) {
     if (argc < 2 || std::string_view(argv[1]) == "--help" || std::string_view(argv[1]) == "-h") {
         print_usage(std::cout);
         return argc < 2 ? 1 : 0;
+    }
+    if (std::string_view(argv[1]) == "--version") {
+        std::cout << "streamview " << STREAMVIEW_VERSION << "\n";
+        return 0;
     }
 
     const std::string_view command = argv[1];

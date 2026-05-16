@@ -24,6 +24,7 @@ product and engineering boundaries.
 - `docs/BUILD_CN.md`
 - `docs/CLI_CN.md`
 - `docs/ROADMAP_CN.md`
+- `docs/RELEASE_CN.md`
 - `AGENTS_CN.md`
 
 ## Build
@@ -65,6 +66,7 @@ sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
 
 ```bash
 ./build/apps/streamview-cli/streamview analyze samples/example.h264
+./build/apps/streamview-cli/streamview --version
 ./build/apps/streamview-cli/streamview analyze samples/example.h264 --json out.json
 ./build/apps/streamview-cli/streamview analyze samples/example.h264 --json summary.json --json-mode summary
 ./build/apps/streamview-cli/streamview analyze samples/example.h264 --json first-nals.json --limit-nals 100
