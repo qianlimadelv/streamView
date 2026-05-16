@@ -1,5 +1,6 @@
 #include "streamview/analysis/stream_analysis.hpp"
 #include "streamview/analysis/validation.hpp"
+#include "streamview/export/analysis_csv_writer.hpp"
 #include "streamview/bitstream/rbsp.hpp"
 #include "streamview/export/analysis_json_writer.hpp"
 #include "streamview/export/json_writer.hpp"
@@ -31,6 +32,7 @@ using streamview::analysis::ValidationIssue;
 enum class OutputFormat {
     Text,
     Json,
+    Csv,
 };
 
 enum class CodecOverride {
@@ -105,7 +107,7 @@ struct ParseDumpArgsResult {
 
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
-        << "  streamview analyze <input> [--format text|json] [--output <path|->] [--codec auto|h264|h265]\n"
+        << "  streamview analyze <input> [--format text|json|csv] [--output <path|->] [--codec auto|h264|h265]\n"
         << "                    [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]\n"
         << "  streamview inspect <input.h264> --nal <index>|--frame <index>|--gop <index>\n"
         << "  streamview errors <input.h264> [--json]\n"
@@ -130,6 +132,9 @@ std::optional<OutputFormat> parse_output_format(std::string_view value) {
     }
     if (value == "json") {
         return OutputFormat::Json;
+    }
+    if (value == "csv") {
+        return OutputFormat::Csv;
     }
     return std::nullopt;
 }
@@ -187,11 +192,11 @@ ParseAnalyzeArgsResult parse_analyze_args(int argc, char** argv) {
             options.output_path = argv[++i];
         } else if (arg == "--format") {
             if (i + 1 >= argc) {
-                return {.error = "--format requires text or json"};
+                return {.error = "--format requires text, json, or csv"};
             }
             const auto format = parse_output_format(argv[++i]);
             if (!format.has_value()) {
-                return {.error = "--format must be text or json"};
+                return {.error = "--format must be text, json, or csv"};
             }
             options.output_format = *format;
         } else if (arg == "--output") {
@@ -489,6 +494,10 @@ int write_analyze_output(const AnalyzeOptions& options, const streamview::analys
                 .mode = options.json_mode,
                 .nal_limit = options.nal_limit,
             });
+        return 0;
+    }
+    if (options.output_format == OutputFormat::Csv) {
+        streamview::exporter::write_analysis_csv(*output, analysis);
         return 0;
     }
 

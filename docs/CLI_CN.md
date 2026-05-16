@@ -6,7 +6,7 @@
 ## 命令
 
 ```bash
-streamview analyze <input> [--format text|json] [--output <path|->] [--codec auto|h264|h265]
+streamview analyze <input> [--format text|json|csv] [--output <path|->] [--codec auto|h264|h265]
                    [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]
 streamview inspect <input> --nal <index>|--frame <index>|--gop <index>
 streamview errors <input> [--json]
@@ -17,6 +17,7 @@ streamview dump <input> --nal <index> [--format hex|payload|rbsp] [--output <pat
 ## Analyze
 
 - 默认输出为 stdout 上的文本摘要。
+- `--format csv` 会输出一行 CSV 摘要，适合表格或 CI 场景。
 - `--format json --output -` 会把 JSON 打到 stdout。
 - `--output <path>` 会把当前选择的格式写入文件。
 - `--json <path>` 作为兼容写法保留，等价于 `--format json --output <path>`。

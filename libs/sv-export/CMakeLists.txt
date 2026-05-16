@@ -1,5 +1,6 @@
 add_library(sv-export
     src/analysis_json_writer.cpp
+    src/analysis_csv_writer.cpp
     src/json_writer.cpp
 )
 

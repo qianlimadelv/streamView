@@ -7,7 +7,7 @@ inspection commands.
 ## Commands
 
 ```bash
-streamview analyze <input> [--format text|json] [--output <path|->] [--codec auto|h264|h265]
+streamview analyze <input> [--format text|json|csv] [--output <path|->] [--codec auto|h264|h265]
                    [--json <output.json>] [--json-mode full|summary] [--limit-nals <count>]
 streamview inspect <input> --nal <index>|--frame <index>|--gop <index>
 streamview errors <input> [--json]
@@ -18,6 +18,7 @@ streamview dump <input> --nal <index> [--format hex|payload|rbsp] [--output <pat
 ## Analyze
 
 - Default output is a text summary on stdout.
+- `--format csv` writes a one-row CSV summary for spreadsheet/CI workflows.
 - `--format json --output -` prints JSON to stdout.
 - `--output <path>` writes the selected format to a file.
 - `--json <path>` is a compatibility alias for `--format json --output <path>`.

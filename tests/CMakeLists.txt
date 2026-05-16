@@ -71,11 +71,43 @@ add_test(
         -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
         -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
         -DSTREAMVIEW_CASE=invalid-format
-        -DSTREAMVIEW_EXPECTED_ERROR=--format\ must\ be\ text\ or\ json
+        -DSTREAMVIEW_EXPECTED_ERROR=--format\ must\ be\ text,\ json,\ or\ csv
         -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_invalid_args_test.cmake
 )
 
 set_tests_properties(streamview-cli-invalid-format
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-csv-h264-minimal
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h264/minimal_sps_pps_idr.h264
+        -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/h264_minimal_summary.csv
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_minimal_summary.actual.csv
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_csv_golden_test.cmake
+)
+
+set_tests_properties(streamview-cli-csv-h264-minimal
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
+    NAME streamview-cli-csv-h265-minimal
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/h265/minimal_vps_sps_pps_idr.h265
+        -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/h265_minimal_summary.csv
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h265_minimal_summary.actual.csv
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_csv_golden_test.cmake
+)
+
+set_tests_properties(streamview-cli-csv-h265-minimal
     PROPERTIES
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
