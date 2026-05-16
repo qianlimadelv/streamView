@@ -325,6 +325,13 @@ void write_frames_json(std::ostream& out, const std::vector<analysis::FrameAnaly
             out << "null";
         }
         out << ",\n";
+        out << "      \"gop_index\": ";
+        if (frame.gop_index.has_value()) {
+            out << *frame.gop_index;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
         out << "      \"size_bytes\": " << frame.size_bytes << ",\n";
         out << "      \"first_payload_offset\": " << frame.first_payload_offset << ",\n";
         out << "      \"nal_indices\": [";

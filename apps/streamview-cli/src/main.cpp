@@ -521,16 +521,6 @@ std::vector<std::size_t> find_frame_indices_for_nal(const streamview::analysis::
     return frame_indices;
 }
 
-std::optional<std::size_t> find_gop_index_for_frame(const streamview::analysis::StreamAnalysis& analysis,
-                                                    std::size_t frame_index) {
-    for (const auto& gop : analysis.gops) {
-        if (frame_index >= gop.start_frame_index && frame_index <= gop.end_frame_index) {
-            return gop.index;
-        }
-    }
-    return std::nullopt;
-}
-
 void write_size_array(std::ostream& out, const std::vector<std::size_t>& values) {
     out << "[";
     for (std::size_t i = 0; i < values.size(); ++i) {
@@ -663,7 +653,6 @@ void write_frame_inspect_json(std::ostream& out,
                               const streamview::analysis::StreamAnalysis& analysis,
                               std::size_t frame_index) {
     const auto& frame = analysis.frames[frame_index];
-    const auto gop_index = find_gop_index_for_frame(analysis, frame_index);
     out << "{\n";
     out << "  \"input\": ";
     streamview::exporter::write_json_string(out, analysis.input_path);
@@ -689,15 +678,15 @@ void write_frame_inspect_json(std::ostream& out,
         out << "null";
     }
     out << ",\n";
-    out << "    \"size_bytes\": " << frame.size_bytes << ",\n";
-    out << "    \"first_payload_offset\": " << frame.first_payload_offset << ",\n";
     out << "    \"gop_index\": ";
-    if (gop_index.has_value()) {
-        out << *gop_index;
+    if (frame.gop_index.has_value()) {
+        out << *frame.gop_index;
     } else {
         out << "null";
     }
     out << ",\n";
+    out << "    \"size_bytes\": " << frame.size_bytes << ",\n";
+    out << "    \"first_payload_offset\": " << frame.first_payload_offset << ",\n";
     out << "    \"nal_indices\": [";
     for (std::size_t i = 0; i < frame.nal_indices.size(); ++i) {
         out << frame.nal_indices[i] << (i + 1 == frame.nal_indices.size() ? "" : ", ");

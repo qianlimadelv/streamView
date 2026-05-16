@@ -9,6 +9,13 @@ void finish_gop(StreamAnalysis& analysis, GopAnalysis& gop, std::size_t end_fram
     analysis.gops.push_back(gop);
 }
 
+void assign_gop_index_to_frame(StreamAnalysis& analysis, std::size_t frame_index, std::size_t gop_index) {
+    if (frame_index >= analysis.frames.size()) {
+        return;
+    }
+    analysis.frames[frame_index].gop_index = gop_index;
+}
+
 } // namespace
 
 void build_gops(StreamAnalysis& analysis) {
@@ -40,6 +47,7 @@ void build_gops(StreamAnalysis& analysis) {
         }
 
         current.size_bytes += frame.size_bytes;
+        assign_gop_index_to_frame(analysis, frame.index, current.index);
     }
 
     if (has_current) {

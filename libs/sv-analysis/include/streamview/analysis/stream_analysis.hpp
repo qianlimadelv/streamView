@@ -83,6 +83,7 @@ struct NalAnalysis {
 struct FrameAnalysis {
     std::size_t index{};
     std::size_t decode_order_index{};
+    std::optional<std::size_t> gop_index;
     std::string codec;
     std::string frame_type;
     bool is_keyframe{};

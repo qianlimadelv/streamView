@@ -201,6 +201,8 @@ void test_analyzes_minimal_h264_stream() {
     require(analysis.nals[2].h264.has_value() && analysis.nals[2].h264->slice.has_value(), "third NAL slice");
     require(analysis.frames.size() == 1, "H.264 frame count");
     require(analysis.frames[0].decode_order_index == 0, "H.264 frame decode order");
+    require(analysis.frames[0].gop_index.has_value(), "H.264 frame gop index present");
+    require(analysis.frames[0].gop_index.value() == 0, "H.264 frame gop index");
     require(!analysis.frames[0].poc.has_value(), "H.264 frame poc absent");
     require(analysis.frames[0].codec == "h264", "H.264 frame codec");
     require(analysis.frames[0].frame_type == "I", "H.264 frame type");
@@ -220,6 +222,8 @@ void test_analyzes_h264_frame_poc_from_context() {
 
     require(analysis.summary.frame_count == 1, "POC H.264 frame count");
     require(analysis.frames.size() == 1, "POC H.264 frames size");
+    require(analysis.frames[0].gop_index.has_value(), "POC H.264 frame gop index present");
+    require(analysis.frames[0].gop_index.value() == 0, "POC H.264 frame gop index");
     require(analysis.frames[0].poc.has_value(), "POC H.264 frame poc present");
     require(analysis.frames[0].poc.value() == 5, "POC H.264 frame poc");
 }
@@ -259,6 +263,8 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.nals[3].h265->slice->slice_kind == streamview::bitstream::H265SliceKind::I, "H.265 slice kind");
     require(analysis.frames.size() == 1, "H.265 frames size");
     require(analysis.frames[0].decode_order_index == 0, "H.265 frame decode order");
+    require(analysis.frames[0].gop_index.has_value(), "H.265 frame gop index present");
+    require(analysis.frames[0].gop_index.value() == 0, "H.265 frame gop index");
     require(!analysis.frames[0].poc.has_value(), "H.265 frame poc absent");
     require(analysis.frames[0].codec == "h265", "H.265 frame codec");
     require(analysis.frames[0].frame_type == "I", "H.265 frame type");
@@ -303,6 +309,8 @@ void test_analyzes_h265_frame_poc_from_context() {
 
     require(analysis.summary.frame_count == 1, "H.265 POC frame count");
     require(analysis.frames.size() == 1, "H.265 POC frames size");
+    require(analysis.frames[0].gop_index.has_value(), "H.265 POC frame gop index present");
+    require(analysis.frames[0].gop_index.value() == 0, "H.265 POC frame gop index");
     require(analysis.frames[0].poc.has_value(), "H.265 POC frame poc present");
     require(analysis.frames[0].poc.value() == 5, "H.265 POC frame poc");
 }

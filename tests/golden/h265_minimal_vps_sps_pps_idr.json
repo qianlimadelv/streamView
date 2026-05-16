@@ -53,6 +53,7 @@
       "frame_type": "I",
       "is_keyframe": true,
       "poc": null,
+      "gop_index": 0,
       "size_bytes": 6,
       "first_payload_offset": 57,
       "nal_indices": [3]
