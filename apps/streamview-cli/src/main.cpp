@@ -672,6 +672,7 @@ void write_frame_inspect_json(std::ostream& out,
     out << "  \"frame_count\": " << analysis.frames.size() << ",\n";
     out << "  \"frame\": {\n";
     out << "    \"index\": " << frame.index << ",\n";
+    out << "    \"decode_order_index\": " << frame.decode_order_index << ",\n";
     out << "    \"codec\": ";
     streamview::exporter::write_json_string(out, frame.codec);
     out << ",\n";
@@ -679,6 +680,13 @@ void write_frame_inspect_json(std::ostream& out,
     streamview::exporter::write_json_string(out, frame.frame_type);
     out << ",\n";
     out << "    \"is_keyframe\": " << (frame.is_keyframe ? "true" : "false") << ",\n";
+    out << "    \"poc\": ";
+    if (frame.poc.has_value()) {
+        out << *frame.poc;
+    } else {
+        out << "null";
+    }
+    out << ",\n";
     out << "    \"size_bytes\": " << frame.size_bytes << ",\n";
     out << "    \"first_payload_offset\": " << frame.first_payload_offset << ",\n";
     out << "    \"gop_index\": ";

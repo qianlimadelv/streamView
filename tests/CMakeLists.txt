@@ -188,6 +188,7 @@ add_test(
         -DSTREAMVIEW_NAL_INDEX=0
         -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/h264_inspect_frame.actual.json
         -DSTREAMVIEW_REQUIRED_FIELD=frame_type
+        -DSTREAMVIEW_EXPECTED_FRAME_FIELD=poc
         -DSTREAMVIEW_INSPECT_KIND=frame
         -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_inspect_test.cmake
 )

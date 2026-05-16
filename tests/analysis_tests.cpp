@@ -128,6 +128,32 @@ std::vector<std::uint8_t> make_minimal_h264_stream() {
     };
 }
 
+std::vector<std::uint8_t> make_h264_poc_stream() {
+    TestBitWriter slice_writer;
+    slice_writer.write_ue(0);
+    slice_writer.write_ue(7);
+    slice_writer.write_ue(0);
+    slice_writer.write_bits(0, 4);
+    slice_writer.write_ue(2);
+    slice_writer.write_bits(5, 6);
+
+    auto slice_rbsp = slice_writer.finish_rbsp();
+
+    std::vector<std::uint8_t> stream{
+        0x00, 0x00, 0x00, 0x01,
+        0x67, 0x64, 0x00, 0x1f, 0xac, 0xd9, 0x40, 0xa0,
+        0x2f, 0xf9, 0x70, 0x11, 0x00, 0x00, 0x03, 0x00,
+        0x01, 0x00, 0x00, 0x03, 0x00, 0x32, 0x0f, 0x18,
+        0x31, 0x96,
+        0x00, 0x00, 0x01,
+        0x68, 0xeb, 0xec, 0xb2,
+        0x00, 0x00, 0x01,
+        0x65,
+    };
+    stream.insert(stream.end(), slice_rbsp.begin(), slice_rbsp.end());
+    return stream;
+}
+
 std::vector<std::uint8_t> make_minimal_h265_stream() {
     std::vector<std::uint8_t> stream{
         0x00, 0x00, 0x00, 0x01,
@@ -171,6 +197,8 @@ void test_analyzes_minimal_h264_stream() {
     require(analysis.nals[1].h264.has_value() && analysis.nals[1].h264->pps.has_value(), "second NAL PPS");
     require(analysis.nals[2].h264.has_value() && analysis.nals[2].h264->slice.has_value(), "third NAL slice");
     require(analysis.frames.size() == 1, "H.264 frame count");
+    require(analysis.frames[0].decode_order_index == 0, "H.264 frame decode order");
+    require(!analysis.frames[0].poc.has_value(), "H.264 frame poc absent");
     require(analysis.frames[0].codec == "h264", "H.264 frame codec");
     require(analysis.frames[0].frame_type == "I", "H.264 frame type");
     require(analysis.frames[0].is_keyframe, "H.264 frame keyframe");
@@ -181,6 +209,16 @@ void test_analyzes_minimal_h264_stream() {
     require(analysis.gops[0].end_frame_index == 0, "H.264 GOP end");
     require(analysis.gops[0].frame_count == 1, "H.264 GOP frame count");
     require(analysis.gops[0].starts_with_keyframe, "H.264 GOP keyframe start");
+}
+
+void test_analyzes_h264_frame_poc_from_context() {
+    const auto stream = make_h264_poc_stream();
+    const auto analysis = streamview::analysis::analyze_h264_annex_b("poc.h264", stream);
+
+    require(analysis.summary.frame_count == 1, "POC H.264 frame count");
+    require(analysis.frames.size() == 1, "POC H.264 frames size");
+    require(analysis.frames[0].poc.has_value(), "POC H.264 frame poc present");
+    require(analysis.frames[0].poc.value() == 5, "POC H.264 frame poc");
 }
 
 void test_analyzes_minimal_h265_stream() {
@@ -216,6 +254,8 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.nals[3].h265->slice->slice_type_present, "H.265 slice type present");
     require(analysis.nals[3].h265->slice->slice_kind == streamview::bitstream::H265SliceKind::I, "H.265 slice kind");
     require(analysis.frames.size() == 1, "H.265 frames size");
+    require(analysis.frames[0].decode_order_index == 0, "H.265 frame decode order");
+    require(!analysis.frames[0].poc.has_value(), "H.265 frame poc absent");
     require(analysis.frames[0].codec == "h265", "H.265 frame codec");
     require(analysis.frames[0].frame_type == "I", "H.265 frame type");
     require(analysis.frames[0].is_keyframe, "H.265 frame keyframe");
@@ -293,6 +333,7 @@ void test_records_h265_parse_errors_without_crashing() {
 
 int main() {
     test_analyzes_minimal_h264_stream();
+    test_analyzes_h264_frame_poc_from_context();
     test_analyzes_minimal_h265_stream();
     test_records_h264_parse_errors_without_frames();
     test_records_h265_parse_errors_without_crashing();

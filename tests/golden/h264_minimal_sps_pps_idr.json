@@ -37,9 +37,11 @@
   "frames": [
     {
       "index": 0,
+      "decode_order_index": 0,
       "codec": "h264",
       "frame_type": "I",
       "is_keyframe": true,
+      "poc": null,
       "size_bytes": 6,
       "first_payload_offset": 40,
       "nal_indices": [2]

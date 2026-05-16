@@ -50,6 +50,7 @@
 - H.265 slice header 前缀字段
 - H.265 slice_type 基础解析
 - H.265 slice 上下文字段：`dependent_slice_segment_flag`、`pic_output_flag`
+- H.264 帧级 `poc` 导出（仅 `pic_order_cnt_type == 0`）
 - VCL NAL 计数
 - 畸形参数集和 slice 输入测试
 - CLI golden JSON 测试

@@ -49,9 +49,13 @@ void add_h264_frame(StreamAnalysis& analysis, const NalAnalysis& nal) {
 
     FrameAnalysis frame{};
     frame.index = analysis.frames.size();
+    frame.decode_order_index = frame.index;
     frame.codec = "h264";
     frame.frame_type = h264_frame_type_name(nal.h264->slice->slice_kind);
     frame.is_keyframe = h264_slice_is_keyframe(nal.h264->header.nal_unit_type, nal.h264->slice->slice_kind);
+    if (nal.h264->slice->pic_order_cnt_lsb_present) {
+        frame.poc = static_cast<std::int64_t>(nal.h264->slice->pic_order_cnt_lsb);
+    }
     frame.nal_indices.push_back(nal.index);
     frame.size_bytes = nal.unit.start_code_size + nal.unit.payload_size;
     frame.first_payload_offset = nal.unit.payload_offset;

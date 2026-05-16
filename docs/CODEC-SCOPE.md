@@ -50,6 +50,7 @@ Supported:
 - H.265 slice header prefix fields
 - H.265 slice_type baseline parsing
 - H.265 contextual slice fields: `dependent_slice_segment_flag`, `pic_output_flag`
+- H.264 frame-level `poc` export for `pic_order_cnt_type == 0`
 
 Not yet supported:
 

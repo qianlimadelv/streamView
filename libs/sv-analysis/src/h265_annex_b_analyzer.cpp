@@ -36,6 +36,7 @@ void add_h265_frame(StreamAnalysis& analysis, const NalAnalysis& nal) {
 
     FrameAnalysis frame{};
     frame.index = analysis.frames.size();
+    frame.decode_order_index = frame.index;
     frame.codec = "h265";
     frame.frame_type = h265_frame_type_name(*nal.h265);
     frame.is_keyframe = h265_nal_is_keyframe(nal.h265->header.nal_unit_type);
