@@ -41,7 +41,8 @@ Use `--json` when scripting.
 
 `validate` runs lightweight structural checks over the analysis model. It
 currently reports parser errors, empty Annex B input, missing frames/keyframes,
-missing parameter sets, and duplicate SPS/PPS/VPS ids. Use `--json` for CI or scripts.
+missing parameter sets, duplicate SPS/PPS/VPS ids, and basic frame/GOP consistency.
+Use `--json` for CI or scripts.
 
 ## Dump
 

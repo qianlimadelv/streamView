@@ -355,6 +355,47 @@ void test_validates_duplicate_h265_parameter_sets() {
             "H.265 duplicate PPS validation issue");
 }
 
+void test_validates_frame_gop_consistency() {
+    streamview::analysis::StreamAnalysis analysis{};
+    analysis.input_path = "synthetic.h264";
+    analysis.codec_guess = "h264";
+    analysis.summary.frame_count = 1;
+    analysis.summary.keyframe_count = 1;
+    analysis.summary.gop_count = 1;
+    analysis.frames.push_back({
+        .index = 0,
+        .decode_order_index = 0,
+        .gop_index = 0,
+        .codec = "h264",
+        .frame_type = "I",
+        .is_keyframe = true,
+        .poc = std::nullopt,
+        .nal_indices = {0},
+        .size_bytes = 10,
+        .first_payload_offset = 0,
+    });
+    analysis.gops.push_back({
+        .index = 0,
+        .start_frame_index = 1,
+        .end_frame_index = 1,
+        .frame_count = 1,
+        .keyframe_index = 2,
+        .size_bytes = 10,
+        .starts_with_keyframe = false,
+    });
+
+    const auto issues = streamview::analysis::validate_stream_analysis(analysis);
+
+    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "frame_gop_index_mismatch" && issue.severity == "error";
+            }),
+            "frame gop mismatch validation issue");
+    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "invalid_gop_keyframe_index" && issue.severity == "error";
+            }),
+            "gop keyframe validation issue");
+}
+
 void test_records_h264_parse_errors_without_frames() {
     const std::vector<std::uint8_t> stream{
         0x00, 0x00, 0x01,
@@ -425,6 +466,7 @@ int main() {
     test_analyzes_h265_frame_poc_from_context();
     test_validates_duplicate_h264_parameter_sets();
     test_validates_duplicate_h265_parameter_sets();
+    test_validates_frame_gop_consistency();
     test_records_h264_parse_errors_without_frames();
     test_records_h265_parse_errors_without_crashing();
     return 0;

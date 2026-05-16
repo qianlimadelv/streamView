@@ -61,6 +61,38 @@ std::vector<ValidationIssue> validate_stream_analysis(const StreamAnalysis& anal
         }
     }
 
+    if (analysis.summary.gop_count != analysis.gops.size()) {
+        add_issue(issues, "warning", "gop_count_mismatch", "summary GOP count does not match the GOP list");
+    }
+    for (const auto& frame : analysis.frames) {
+        if (!frame.gop_index.has_value()) {
+            add_issue(issues, "warning", "frame_missing_gop_index", "frame does not have a GOP index assigned");
+            continue;
+        }
+        if (*frame.gop_index >= analysis.gops.size()) {
+            add_issue(issues, "error", "frame_gop_index_out_of_range", "frame GOP index is out of range");
+            continue;
+        }
+        const auto& gop = analysis.gops[*frame.gop_index];
+        if (frame.index < gop.start_frame_index || frame.index > gop.end_frame_index) {
+            add_issue(issues, "error", "frame_gop_index_mismatch", "frame is not covered by its GOP range");
+        }
+    }
+    for (const auto& gop : analysis.gops) {
+        if (gop.start_frame_index > gop.end_frame_index) {
+            add_issue(issues,
+                      "error",
+                      "invalid_gop_range",
+                      "GOP start frame index is greater than the end frame index");
+        }
+        if (gop.keyframe_index < gop.start_frame_index || gop.keyframe_index > gop.end_frame_index) {
+            add_issue(issues,
+                      "error",
+                      "invalid_gop_keyframe_index",
+                      "GOP keyframe index is outside the GOP range");
+        }
+    }
+
     if (analysis.summary.parse_errors.total > 0) {
         add_issue(issues, "error", "parse_errors", "bitstream contains parser errors");
     }
