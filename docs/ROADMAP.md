@@ -39,7 +39,7 @@
 
 ## Phase 4.5: Engineering
 
-- Linux GitHub Actions build/test
+- Linux/macOS/Windows GitHub Actions build/test
 - Windows/macOS build instructions
 - Release artifact structure
 - Real-stream summary regression set
