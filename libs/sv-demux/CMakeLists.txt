@@ -1,4 +1,5 @@
 add_library(sv-demux
+    src/ffmpeg_mp4_demuxer.cpp
     src/ffmpeg_h264_demuxer.cpp
 )
 

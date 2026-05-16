@@ -5,7 +5,7 @@
 #include "streamview/export/analysis_json_writer.hpp"
 #include "streamview/export/json_writer.hpp"
 #if defined(STREAMVIEW_HAS_FFMPEG_DEMUX)
-#include "streamview/demux/ffmpeg_h264_demuxer.hpp"
+#include "streamview/demux/ffmpeg_mp4_demuxer.hpp"
 #endif
 
 #ifndef STREAMVIEW_VERSION
@@ -98,6 +98,11 @@ struct DumpOptions {
     std::size_t nal_index{};
     DumpFormat format{DumpFormat::Hex};
     std::optional<std::string> output_path;
+};
+
+struct InputData {
+    std::vector<std::uint8_t> bytes;
+    std::optional<CodecOverride> codec_hint;
 };
 
 struct ParseDumpArgsResult {
@@ -382,54 +387,64 @@ bool has_extension(const std::string& path, std::string_view extension) {
     return std::filesystem::path(path).extension() == extension;
 }
 
-bool is_h265_input(const std::string& path) {
-    return has_extension(path, ".h265") || has_extension(path, ".265");
+std::optional<CodecOverride> codec_from_extension(const std::string& path) {
+    if (has_extension(path, ".h265") || has_extension(path, ".265")) {
+        return CodecOverride::H265;
+    }
+    if (has_extension(path, ".h264") || has_extension(path, ".264")) {
+        return CodecOverride::H264;
+    }
+    return std::nullopt;
 }
 
-std::optional<std::vector<std::uint8_t>> load_input_as_annex_b(const std::string& path) {
-    if (has_extension(path, ".h264") || has_extension(path, ".264")) {
-        return read_file(path);
+std::optional<InputData> load_input_data(const std::string& path) {
+    if (const auto codec = codec_from_extension(path); codec.has_value()) {
+        const auto data = read_file(path);
+        if (!data.has_value()) {
+            return std::nullopt;
+        }
+        return InputData{.bytes = std::move(*data), .codec_hint = codec};
     }
 
     if (has_extension(path, ".mp4")) {
 #if defined(STREAMVIEW_HAS_FFMPEG_DEMUX)
-        const auto demux = streamview::demux::demux_h264_to_annex_b(path);
+        const auto demux = streamview::demux::demux_mp4_to_annex_b(path);
         if (!demux.status.is_ok()) {
             std::cerr << "streamview: failed to demux MP4: " << demux.status.message() << "\n";
             return std::nullopt;
         }
-        return demux.annex_b;
+        return InputData{
+            .bytes = std::move(demux.annex_b),
+            .codec_hint = demux.codec == streamview::demux::DemuxCodec::H265 ? CodecOverride::H265
+                                                                            : CodecOverride::H264,
+        };
 #else
         std::cerr << "streamview: MP4 input requires FFmpeg development libraries at build time\n";
         return std::nullopt;
 #endif
     }
 
-    return read_file(path);
-}
-
-bool should_analyze_h265(const std::string& input_path, CodecOverride codec) {
-    if (codec == CodecOverride::H265) {
-        return true;
+    const auto data = read_file(path);
+    if (!data.has_value()) {
+        return std::nullopt;
     }
-    if (codec == CodecOverride::H264) {
-        return false;
-    }
-    return is_h265_input(input_path);
+    return InputData{.bytes = std::move(*data), .codec_hint = std::nullopt};
 }
 
 std::optional<streamview::analysis::StreamAnalysis> analyze_input(const std::string& input_path,
                                                                   CodecOverride codec = CodecOverride::Auto) {
-    const auto data = load_input_as_annex_b(input_path);
-    if (!data.has_value()) {
+    const auto input = load_input_data(input_path);
+    if (!input.has_value()) {
         std::cerr << "streamview: failed to read input file: " << input_path << "\n";
         return std::nullopt;
     }
 
-    if (should_analyze_h265(input_path, codec)) {
-        return streamview::analysis::analyze_h265_annex_b(input_path, *data);
+    const auto resolved_codec = codec == CodecOverride::Auto && input->codec_hint.has_value() ? *input->codec_hint
+                                                                                              : codec;
+    if (resolved_codec == CodecOverride::H265) {
+        return streamview::analysis::analyze_h265_annex_b(input_path, input->bytes);
     }
-    return streamview::analysis::analyze_h264_annex_b(input_path, *data);
+    return streamview::analysis::analyze_h264_annex_b(input_path, input->bytes);
 }
 
 void write_text_summary(std::ostream& out, const streamview::analysis::StreamAnalysis& analysis) {
@@ -972,13 +987,13 @@ int write_dump_output(const DumpOptions& options, std::span<const std::uint8_t> 
 }
 
 int run_dump(const DumpOptions& options) {
-    const auto data = load_input_as_annex_b(options.input_path);
-    if (!data.has_value()) {
+    const auto input = load_input_data(options.input_path);
+    if (!input.has_value()) {
         std::cerr << "streamview: failed to read input file: " << options.input_path << "\n";
         return 2;
     }
 
-    const auto nals = streamview::bitstream::scan_annex_b(*data);
+    const auto nals = streamview::bitstream::scan_annex_b(input->bytes);
     if (options.nal_index >= nals.size()) {
         std::cerr << "streamview: NAL index out of range: " << options.nal_index
                   << " >= " << nals.size() << "\n";
@@ -986,7 +1001,7 @@ int run_dump(const DumpOptions& options) {
     }
 
     const auto& nal = nals[options.nal_index];
-    const auto payload = std::span<const std::uint8_t>(*data).subspan(nal.payload_offset, nal.payload_size);
+    const auto payload = std::span<const std::uint8_t>(input->bytes).subspan(nal.payload_offset, nal.payload_size);
     if (options.format == DumpFormat::Rbsp) {
         const auto rbsp = streamview::bitstream::nal_payload_to_rbsp(payload);
         return write_dump_output(options, rbsp);

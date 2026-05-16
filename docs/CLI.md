@@ -4,6 +4,9 @@ The current CLI is the MVP entry point before the GUI layer exists. It focuses
 on reproducible stream analysis, machine-readable export, and small scoped
 inspection commands.
 
+It accepts raw Annex B inputs directly, and MP4 inputs when FFmpeg demux support
+is built in.
+
 ## Commands
 
 ```bash

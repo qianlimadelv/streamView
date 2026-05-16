@@ -1,0 +1,51 @@
+{
+  "format": "annex_b",
+  "codec_guess": "h265",
+  "input": "tests/samples/mp4/short_h265.mp4",
+  "size_bytes": 7154275,
+  "nal_count": 194,
+  "stream_summary": {
+    "vps_count": 2,
+    "sps_count": 2,
+    "pps_count": 2,
+    "frame_count": 62,
+    "keyframe_count": 2,
+    "gop_count": 2,
+    "slice_count": 62,
+    "slice_types": {
+      "I": 2,
+      "P": 15,
+      "B": 45,
+      "SP": 0,
+      "SI": 0
+    },
+    "parse_errors": {
+      "total": 0,
+      "vps": 0,
+      "sps": 0,
+      "pps": 0,
+      "slice": 0
+    },
+    "active_h265_vps": {
+      "profile_idc": 2,
+      "tier_flag": true,
+      "level_idc": 153,
+      "video_parameter_set_id": 0,
+      "max_layers_minus1": 0,
+      "max_sub_layers_minus1": 2
+    },
+    "active_h265_sps": {
+      "profile_idc": 2,
+      "tier_flag": true,
+      "level_idc": 153,
+      "video_parameter_set_id": 0,
+      "seq_parameter_set_id": 0,
+      "log2_max_pic_order_cnt_lsb_minus4": 7,
+      "width": 3840,
+      "height": 2160
+    }
+  },
+  "frames_omitted": 62,
+  "gops_omitted": 2,
+  "nals_omitted": 194
+}
