@@ -396,6 +396,141 @@ void test_validates_frame_gop_consistency() {
             "gop keyframe validation issue");
 }
 
+void test_validates_resolution_change_detection() {
+    streamview::analysis::StreamAnalysis analysis{};
+    analysis.input_path = "resolution-change.h264";
+    analysis.codec_guess = "h264";
+    analysis.summary.frame_count = 1;
+    analysis.summary.keyframe_count = 1;
+    analysis.summary.sps_count = 2;
+    analysis.summary.pps_count = 1;
+    analysis.summary.gop_count = 1;
+
+    streamview::analysis::NalAnalysis sps_nal_1{};
+    sps_nal_1.index = 0;
+    sps_nal_1.h264 = streamview::analysis::H264NalAnalysis{};
+    sps_nal_1.h264->sps = streamview::bitstream::H264SpsInfo{};
+    sps_nal_1.h264->sps->seq_parameter_set_id = 0;
+    sps_nal_1.h264->sps->width = 640;
+    sps_nal_1.h264->sps->height = 360;
+
+    streamview::analysis::NalAnalysis sps_nal_2{};
+    sps_nal_2.index = 1;
+    sps_nal_2.h264 = streamview::analysis::H264NalAnalysis{};
+    sps_nal_2.h264->sps = streamview::bitstream::H264SpsInfo{};
+    sps_nal_2.h264->sps->seq_parameter_set_id = 1;
+    sps_nal_2.h264->sps->width = 1280;
+    sps_nal_2.h264->sps->height = 720;
+
+    streamview::analysis::NalAnalysis slice_nal{};
+    slice_nal.index = 2;
+    slice_nal.h264 = streamview::analysis::H264NalAnalysis{};
+    slice_nal.h264->slice = streamview::bitstream::H264SliceHeaderInfo{};
+    slice_nal.h264->slice->pic_parameter_set_id = 0;
+
+    analysis.nals = {sps_nal_1, sps_nal_2, slice_nal};
+    analysis.frames.push_back({
+        .index = 0,
+        .decode_order_index = 0,
+        .gop_index = 0,
+        .codec = "h264",
+        .frame_type = "I",
+        .is_keyframe = true,
+        .poc = std::nullopt,
+        .nal_indices = {2},
+        .size_bytes = 10,
+        .first_payload_offset = 0,
+    });
+    analysis.gops.push_back({
+        .index = 0,
+        .start_frame_index = 0,
+        .end_frame_index = 0,
+        .frame_count = 1,
+        .keyframe_index = 0,
+        .size_bytes = 10,
+        .starts_with_keyframe = true,
+    });
+
+    const auto issues = streamview::analysis::validate_stream_analysis(analysis);
+
+    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "h264_resolution_change_detected" && issue.severity == "warning";
+            }),
+            "H.264 resolution change validation issue");
+}
+
+void test_validates_h265_resolution_change_detection() {
+    streamview::analysis::StreamAnalysis analysis{};
+    analysis.input_path = "resolution-change.h265";
+    analysis.codec_guess = "h265";
+    analysis.summary.frame_count = 1;
+    analysis.summary.keyframe_count = 1;
+    analysis.summary.vps_count = 1;
+    analysis.summary.sps_count = 2;
+    analysis.summary.pps_count = 1;
+    analysis.summary.gop_count = 1;
+
+    streamview::analysis::NalAnalysis vps_nal{};
+    vps_nal.index = 0;
+    vps_nal.h265 = streamview::analysis::H265NalAnalysis{};
+    vps_nal.h265->vps = streamview::bitstream::H265VpsInfo{};
+    vps_nal.h265->vps->video_parameter_set_id = 0;
+
+    streamview::analysis::NalAnalysis sps_nal_1{};
+    sps_nal_1.index = 1;
+    sps_nal_1.h265 = streamview::analysis::H265NalAnalysis{};
+    sps_nal_1.h265->sps = streamview::bitstream::H265SpsInfo{};
+    sps_nal_1.h265->sps->seq_parameter_set_id = 0;
+    sps_nal_1.h265->sps->video_parameter_set_id = 0;
+    sps_nal_1.h265->sps->width = 640;
+    sps_nal_1.h265->sps->height = 360;
+
+    streamview::analysis::NalAnalysis sps_nal_2{};
+    sps_nal_2.index = 2;
+    sps_nal_2.h265 = streamview::analysis::H265NalAnalysis{};
+    sps_nal_2.h265->sps = streamview::bitstream::H265SpsInfo{};
+    sps_nal_2.h265->sps->seq_parameter_set_id = 1;
+    sps_nal_2.h265->sps->video_parameter_set_id = 0;
+    sps_nal_2.h265->sps->width = 1280;
+    sps_nal_2.h265->sps->height = 720;
+
+    streamview::analysis::NalAnalysis slice_nal{};
+    slice_nal.index = 3;
+    slice_nal.h265 = streamview::analysis::H265NalAnalysis{};
+    slice_nal.h265->slice = streamview::bitstream::H265SliceHeaderInfo{};
+    slice_nal.h265->slice->slice_pic_parameter_set_id = 0;
+
+    analysis.nals = {vps_nal, sps_nal_1, sps_nal_2, slice_nal};
+    analysis.frames.push_back({
+        .index = 0,
+        .decode_order_index = 0,
+        .gop_index = 0,
+        .codec = "h265",
+        .frame_type = "I",
+        .is_keyframe = true,
+        .poc = std::nullopt,
+        .nal_indices = {3},
+        .size_bytes = 10,
+        .first_payload_offset = 0,
+    });
+    analysis.gops.push_back({
+        .index = 0,
+        .start_frame_index = 0,
+        .end_frame_index = 0,
+        .frame_count = 1,
+        .keyframe_index = 0,
+        .size_bytes = 10,
+        .starts_with_keyframe = true,
+    });
+
+    const auto issues = streamview::analysis::validate_stream_analysis(analysis);
+
+    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "h265_resolution_change_detected" && issue.severity == "warning";
+            }),
+            "H.265 resolution change validation issue");
+}
+
 void test_records_h264_parse_errors_without_frames() {
     const std::vector<std::uint8_t> stream{
         0x00, 0x00, 0x01,
@@ -467,6 +602,8 @@ int main() {
     test_validates_duplicate_h264_parameter_sets();
     test_validates_duplicate_h265_parameter_sets();
     test_validates_frame_gop_consistency();
+    test_validates_resolution_change_detection();
+    test_validates_h265_resolution_change_detection();
     test_records_h264_parse_errors_without_frames();
     test_records_h265_parse_errors_without_crashing();
     return 0;

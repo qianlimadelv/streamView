@@ -23,6 +23,8 @@ std::vector<ValidationIssue> validate_stream_analysis(const StreamAnalysis& anal
     std::set<std::uint32_t> h265_vps_ids;
     std::set<std::uint32_t> h265_sps_ids;
     std::set<std::uint32_t> h265_pps_ids;
+    std::optional<std::pair<std::uint32_t, std::uint32_t>> h264_resolution;
+    std::optional<std::pair<std::uint32_t, std::uint32_t>> h265_resolution;
 
     for (const auto& nal : analysis.nals) {
         if (nal.h264.has_value()) {
@@ -30,6 +32,18 @@ std::vector<ValidationIssue> validate_stream_analysis(const StreamAnalysis& anal
                 const auto [_, inserted] = h264_sps_ids.insert(nal.h264->sps->seq_parameter_set_id);
                 if (!inserted) {
                     add_issue(issues, "warning", "duplicate_h264_sps_id", "H.264 SPS id is defined more than once");
+                }
+                const auto current_resolution = std::pair<std::uint32_t, std::uint32_t>{
+                    nal.h264->sps->width,
+                    nal.h264->sps->height,
+                };
+                if (!h264_resolution.has_value()) {
+                    h264_resolution = current_resolution;
+                } else if (*h264_resolution != current_resolution) {
+                    add_issue(issues,
+                              "warning",
+                              "h264_resolution_change_detected",
+                              "H.264 stream contains SPS entries with different resolutions");
                 }
             }
             if (nal.h264->pps.has_value()) {
@@ -50,6 +64,18 @@ std::vector<ValidationIssue> validate_stream_analysis(const StreamAnalysis& anal
                 const auto [_, inserted] = h265_sps_ids.insert(nal.h265->sps->seq_parameter_set_id);
                 if (!inserted) {
                     add_issue(issues, "warning", "duplicate_h265_sps_id", "H.265 SPS id is defined more than once");
+                }
+                const auto current_resolution = std::pair<std::uint32_t, std::uint32_t>{
+                    nal.h265->sps->width,
+                    nal.h265->sps->height,
+                };
+                if (!h265_resolution.has_value()) {
+                    h265_resolution = current_resolution;
+                } else if (*h265_resolution != current_resolution) {
+                    add_issue(issues,
+                              "warning",
+                              "h265_resolution_change_detected",
+                              "H.265 stream contains SPS entries with different resolutions");
                 }
             }
             if (nal.h265->pps.has_value()) {

@@ -43,6 +43,7 @@ Use `--json` when scripting.
 currently reports parser errors, empty Annex B input, missing frames/keyframes,
 missing parameter sets, duplicate SPS/PPS/VPS ids, and basic frame/GOP consistency.
 Use `--json` for CI or scripts.
+It also warns when parsed SPS entries disagree on resolution.
 
 ## Dump
 
