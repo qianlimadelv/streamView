@@ -1,0 +1,50 @@
+{
+  "format": "annex_b",
+  "codec_guess": "h265",
+  "input": "/home/zhangyp/code/media/video_265_sd.h265",
+  "size_bytes": 21090718,
+  "nal_count": 2712,
+  "stream_summary": {
+    "vps_count": 18,
+    "sps_count": 18,
+    "pps_count": 18,
+    "frame_count": 2658,
+    "keyframe_count": 18,
+    "gop_count": 18,
+    "slice_count": 2658,
+    "slice_types": {
+      "I": 18,
+      "P": 2640,
+      "B": 0,
+      "SP": 0,
+      "SI": 0
+    },
+    "parse_errors": {
+      "total": 0,
+      "vps": 0,
+      "sps": 0,
+      "pps": 0,
+      "slice": 0
+    },
+    "active_h265_vps": {
+      "profile_idc": 1,
+      "tier_flag": false,
+      "level_idc": 150,
+      "video_parameter_set_id": 0,
+      "max_layers_minus1": 0,
+      "max_sub_layers_minus1": 0
+    },
+    "active_h265_sps": {
+      "profile_idc": 1,
+      "tier_flag": false,
+      "level_idc": 150,
+      "video_parameter_set_id": 0,
+      "seq_parameter_set_id": 0,
+      "width": 2560,
+      "height": 1440
+    }
+  },
+  "frames_omitted": 2658,
+  "gops_omitted": 18,
+  "nals_omitted": 2712
+}
