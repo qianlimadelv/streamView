@@ -40,6 +40,7 @@
       "level_idc": 150,
       "video_parameter_set_id": 0,
       "seq_parameter_set_id": 0,
+      "log2_max_pic_order_cnt_lsb_minus4": 6,
       "width": 2560,
       "height": 1440
     }

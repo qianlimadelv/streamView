@@ -71,6 +71,7 @@ std::vector<std::uint8_t> make_h265_sps_payload(std::uint32_t width, std::uint32
     writer.write_bit(false);
     writer.write_ue(0);
     writer.write_ue(0);
+    writer.write_ue(0);
 
     auto rbsp = writer.finish_rbsp();
     std::vector<std::uint8_t> payload{0x42, 0x01};
@@ -235,6 +236,7 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.summary.active_h265_vps->profile_idc == 1, "H.265 summary VPS profile");
     require(analysis.summary.active_h265_vps->level_idc == 120, "H.265 summary VPS level");
     require(analysis.summary.active_h265_sps.has_value(), "H.265 active SPS");
+    require(analysis.summary.active_h265_sps->log2_max_pic_order_cnt_lsb_minus4 == 0, "H.265 summary poc lsb shift");
     require(analysis.summary.active_h265_sps->width == 640, "H.265 summary width");
     require(analysis.summary.active_h265_sps->height == 360, "H.265 summary height");
     require(analysis.summary.frame_count == 1, "H.265 frame count");
@@ -266,6 +268,41 @@ void test_analyzes_minimal_h265_stream() {
     require(analysis.gops[0].end_frame_index == 0, "H.265 GOP end");
     require(analysis.gops[0].frame_count == 1, "H.265 GOP frame count");
     require(analysis.gops[0].starts_with_keyframe, "H.265 GOP keyframe start");
+}
+
+void test_analyzes_h265_frame_poc_from_context() {
+    TestBitWriter writer;
+    writer.write_bit(true);
+    writer.write_ue(0);
+    writer.write_ue(1);
+    writer.write_bits(5, 4);
+    auto slice_rbsp = writer.finish_rbsp();
+
+    std::vector<std::uint8_t> stream{
+        0x00, 0x00, 0x00, 0x01,
+    };
+    const auto vps = make_h265_vps_payload();
+    stream.insert(stream.end(), vps.begin(), vps.end());
+    const std::vector<std::uint8_t> sps_start{0x00, 0x00, 0x01};
+    stream.insert(stream.end(), sps_start.begin(), sps_start.end());
+    const auto sps = make_h265_sps_payload(640, 360);
+    stream.insert(stream.end(), sps.begin(), sps.end());
+    const std::vector<std::uint8_t> pps_start{0x00, 0x00, 0x01};
+    stream.insert(stream.end(), pps_start.begin(), pps_start.end());
+    const std::vector<std::uint8_t> pps{0x44, 0x01, 0xc0};
+    stream.insert(stream.end(), pps.begin(), pps.end());
+    const std::vector<std::uint8_t> slice_start{0x00, 0x00, 0x01};
+    stream.insert(stream.end(), slice_start.begin(), slice_start.end());
+    const std::vector<std::uint8_t> slice_header{0x02, 0x01};
+    stream.insert(stream.end(), slice_header.begin(), slice_header.end());
+    stream.insert(stream.end(), slice_rbsp.begin(), slice_rbsp.end());
+
+    const auto analysis = streamview::analysis::analyze_h265_annex_b("poc.h265", stream);
+
+    require(analysis.summary.frame_count == 1, "H.265 POC frame count");
+    require(analysis.frames.size() == 1, "H.265 POC frames size");
+    require(analysis.frames[0].poc.has_value(), "H.265 POC frame poc present");
+    require(analysis.frames[0].poc.value() == 5, "H.265 POC frame poc");
 }
 
 void test_records_h264_parse_errors_without_frames() {
@@ -335,6 +372,7 @@ int main() {
     test_analyzes_minimal_h264_stream();
     test_analyzes_h264_frame_poc_from_context();
     test_analyzes_minimal_h265_stream();
+    test_analyzes_h265_frame_poc_from_context();
     test_records_h264_parse_errors_without_frames();
     test_records_h265_parse_errors_without_crashing();
     return 0;

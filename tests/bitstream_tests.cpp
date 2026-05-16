@@ -83,6 +83,7 @@ std::vector<std::uint8_t> make_h265_sps_payload(std::uint32_t width, std::uint32
     writer.write_bit(false); // conformance_window_flag
     writer.write_ue(0);      // bit_depth_luma_minus8
     writer.write_ue(0);      // bit_depth_chroma_minus8
+    writer.write_ue(0);      // log2_max_pic_order_cnt_lsb_minus4
 
     auto rbsp = writer.finish_rbsp();
     std::vector<std::uint8_t> payload{0x42, 0x01};
@@ -364,6 +365,7 @@ void test_parses_h265_sps_dimensions() {
     require(result.info->chroma_format_idc == 1, "H.265 SPS chroma_format_idc");
     require(result.info->bit_depth_luma == 8, "H.265 SPS bit_depth_luma");
     require(result.info->bit_depth_chroma == 8, "H.265 SPS bit_depth_chroma");
+    require(result.info->log2_max_pic_order_cnt_lsb_minus4 == 0, "H.265 SPS log2_max_pic_order_cnt_lsb_minus4");
     require(result.info->width == 640, "H.265 SPS width");
     require(result.info->height == 360, "H.265 SPS height");
 }
@@ -415,6 +417,34 @@ void test_parses_h265_slice_header_context_fields() {
     require(result.info->slice_kind == streamview::bitstream::H265SliceKind::I, "H.265 context slice kind");
     require(result.info->pic_output_flag_present, "H.265 pic output flag present");
     require(result.info->pic_output_flag, "H.265 pic output flag");
+}
+
+void test_parses_h265_slice_header_poc_lsb() {
+    TestBitWriter writer;
+    writer.write_bit(true);
+    writer.write_ue(0);
+    writer.write_ue(1);
+    writer.write_bits(5, 4);
+
+    auto rbsp = writer.finish_rbsp();
+    std::vector<std::uint8_t> slice{0x02, 0x01};
+    slice.insert(slice.end(), rbsp.begin(), rbsp.end());
+
+    const auto result = streamview::bitstream::parse_h265_slice_header(
+        slice,
+        streamview::bitstream::H265NalType::TrailR,
+        streamview::bitstream::H265SliceHeaderContext{
+            .num_extra_slice_header_bits = 0,
+            .log2_max_pic_order_cnt_lsb_minus4 = 0,
+            .is_irap = false,
+        });
+
+    require(result.status.is_ok(), "H.265 POC slice parse status");
+    require(result.info.has_value(), "H.265 POC slice info present");
+    require(result.info->slice_type_present, "H.265 POC slice type present");
+    require(result.info->slice_kind == streamview::bitstream::H265SliceKind::P, "H.265 POC slice kind");
+    require(result.info->pic_order_cnt_lsb_present, "H.265 POC LSB present");
+    require(result.info->pic_order_cnt_lsb == 5, "H.265 POC LSB");
 }
 
 void test_parses_h265_pps_baseline_fields() {
@@ -471,6 +501,7 @@ int main() {
     test_parses_h265_sps_dimensions();
     test_parses_h265_pps_baseline_fields();
     test_parses_h265_slice_header_prefix();
+    test_parses_h265_slice_header_poc_lsb();
     test_parses_h265_slice_header_context_fields();
     test_rejects_truncated_h265_parameter_sets_and_slice();
     return 0;

@@ -50,6 +50,8 @@ Supported:
 - H.265 slice header prefix fields
 - H.265 slice_type baseline parsing
 - H.265 contextual slice fields: `dependent_slice_segment_flag`, `pic_output_flag`
+- H.265 SPS POC field: `log2_max_pic_order_cnt_lsb_minus4`
+- H.265 frame-level `poc` export for non-IRAP slices with `pic_order_cnt_lsb`
 - H.264 frame-level `poc` export for `pic_order_cnt_type == 0`
 
 Not yet supported:

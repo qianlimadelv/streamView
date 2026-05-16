@@ -624,6 +624,8 @@ void write_nal_inspect_json(std::ostream& out,
             out << "    \"level_idc\": " << static_cast<int>(nal.h265->sps->level_idc) << ",\n";
             out << "    \"video_parameter_set_id\": " << nal.h265->sps->video_parameter_set_id << ",\n";
             out << "    \"seq_parameter_set_id\": " << nal.h265->sps->seq_parameter_set_id << ",\n";
+            out << "    \"log2_max_pic_order_cnt_lsb_minus4\": "
+                << nal.h265->sps->log2_max_pic_order_cnt_lsb_minus4 << ",\n";
             out << "    \"width\": " << nal.h265->sps->width << ",\n";
             out << "    \"height\": " << nal.h265->sps->height;
         } else if (nal.h265->pps.has_value()) {
@@ -643,6 +645,10 @@ void write_nal_inspect_json(std::ostream& out,
                 out << ",\n";
                 out << "    \"dependent_slice_segment_flag\": "
                     << (nal.h265->slice->dependent_slice_segment_flag ? "true" : "false");
+            }
+            if (nal.h265->slice->pic_order_cnt_lsb_present) {
+                out << ",\n";
+                out << "    \"pic_order_cnt_lsb\": " << nal.h265->slice->pic_order_cnt_lsb;
             }
             if (nal.h265->slice->pic_output_flag_present) {
                 out << ",\n";

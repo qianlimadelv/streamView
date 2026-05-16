@@ -35,6 +35,7 @@ H265SliceHeaderParseResult parse_h265_slice_header(
         nal_unit_type,
         H265SliceHeaderContext{
             .num_extra_slice_header_bits = num_extra_slice_header_bits,
+            .is_irap = h265_nal_type_is_irap(nal_unit_type),
         });
 }
 
@@ -105,6 +106,15 @@ H265SliceHeaderParseResult parse_h265_slice_header(
             info.pic_output_flag_present = true;
             info.pic_output_flag = *pic_output_flag;
         }
+    }
+
+    if (!context.is_irap && context.log2_max_pic_order_cnt_lsb_minus4.has_value()) {
+        const auto pic_order_cnt_lsb = reader.read_bits(*context.log2_max_pic_order_cnt_lsb_minus4 + 4);
+        if (!pic_order_cnt_lsb.has_value()) {
+            return {Status::parse_error("failed to read H.265 slice_pic_order_cnt_lsb"), std::nullopt};
+        }
+        info.pic_order_cnt_lsb_present = true;
+        info.pic_order_cnt_lsb = *pic_order_cnt_lsb;
     }
 
     return {Status::ok(), info};

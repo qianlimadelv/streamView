@@ -187,6 +187,15 @@ H265SpsParseResult parse_h265_sps(std::span<const std::uint8_t> nal_payload) {
     info.bit_depth_luma = static_cast<std::uint8_t>(*bit_depth_luma_minus8 + 8);
     info.bit_depth_chroma = static_cast<std::uint8_t>(*bit_depth_chroma_minus8 + 8);
 
+    const auto log2_max_pic_order_cnt_lsb_minus4 = reader.read_ue();
+    if (!log2_max_pic_order_cnt_lsb_minus4.has_value()) {
+        return {Status::parse_error("failed to read H.265 log2_max_pic_order_cnt_lsb_minus4"), std::nullopt};
+    }
+    if (*log2_max_pic_order_cnt_lsb_minus4 > 12) {
+        return {Status::parse_error("invalid H.265 log2_max_pic_order_cnt_lsb_minus4"), std::nullopt};
+    }
+    info.log2_max_pic_order_cnt_lsb_minus4 = *log2_max_pic_order_cnt_lsb_minus4;
+
     return {Status::ok(), info};
 }
 

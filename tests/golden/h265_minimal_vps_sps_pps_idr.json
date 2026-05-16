@@ -40,6 +40,7 @@
       "level_idc": 120,
       "video_parameter_set_id": 0,
       "seq_parameter_set_id": 0,
+      "log2_max_pic_order_cnt_lsb_minus4": 0,
       "width": 640,
       "height": 360
     }
@@ -121,6 +122,7 @@
           "chroma_format_idc": 1,
           "bit_depth_luma": 8,
           "bit_depth_chroma": 8,
+          "log2_max_pic_order_cnt_lsb_minus4": 0,
           "width": 640,
           "height": 360,
           "conformance_window_flag": false

@@ -19,6 +19,7 @@ struct H265SpsInfo {
     bool separate_colour_plane_flag{};
     std::uint8_t bit_depth_luma{8};
     std::uint8_t bit_depth_chroma{8};
+    std::uint32_t log2_max_pic_order_cnt_lsb_minus4{};
     std::uint32_t width{};
     std::uint32_t height{};
     bool conformance_window_flag{};

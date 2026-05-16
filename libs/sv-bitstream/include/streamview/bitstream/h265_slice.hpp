@@ -28,12 +28,16 @@ struct H265SliceHeaderInfo {
     bool dependent_slice_segment_flag{};
     bool pic_output_flag_present{};
     bool pic_output_flag{};
+    bool pic_order_cnt_lsb_present{};
+    std::uint32_t pic_order_cnt_lsb{};
 };
 
 struct H265SliceHeaderContext {
     std::optional<std::uint8_t> num_extra_slice_header_bits;
+    std::optional<std::uint32_t> log2_max_pic_order_cnt_lsb_minus4;
     bool dependent_slice_segments_enabled_flag{};
     bool output_flag_present_flag{};
+    bool is_irap{};
 };
 
 struct H265SliceHeaderParseResult {

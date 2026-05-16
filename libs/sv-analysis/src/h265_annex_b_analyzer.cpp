@@ -29,6 +29,11 @@ bool h265_nal_is_keyframe(bitstream::H265NalType type) {
            type == bitstream::H265NalType::CraNut;
 }
 
+bool h265_nal_type_is_irap(bitstream::H265NalType type) {
+    const auto value = static_cast<std::uint8_t>(type);
+    return value >= 16 && value <= 23;
+}
+
 void add_h265_frame(StreamAnalysis& analysis, const NalAnalysis& nal) {
     if (!nal.h265.has_value() || !bitstream::h265_nal_type_is_vcl(nal.h265->header.nal_unit_type)) {
         return;
@@ -40,6 +45,9 @@ void add_h265_frame(StreamAnalysis& analysis, const NalAnalysis& nal) {
     frame.codec = "h265";
     frame.frame_type = h265_frame_type_name(*nal.h265);
     frame.is_keyframe = h265_nal_is_keyframe(nal.h265->header.nal_unit_type);
+    if (nal.h265->slice.has_value() && nal.h265->slice->pic_order_cnt_lsb_present) {
+        frame.poc = static_cast<std::int64_t>(nal.h265->slice->pic_order_cnt_lsb);
+    }
     frame.nal_indices.push_back(nal.index);
     frame.size_bytes = nal.unit.start_code_size + nal.unit.payload_size;
     frame.first_payload_offset = nal.unit.payload_offset;
@@ -85,6 +93,7 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
 
     const auto units = bitstream::scan_annex_b(data);
     analysis.nals.reserve(units.size());
+    std::map<std::uint32_t, bitstream::H265SpsInfo> sps_by_id;
     std::map<std::uint32_t, bitstream::H265PpsInfo> pps_by_id;
 
     for (std::size_t i = 0; i < units.size(); ++i) {
@@ -113,6 +122,7 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                 const auto sps = bitstream::parse_h265_sps(payload);
                 if (sps.status.is_ok() && sps.info.has_value()) {
                     nal.h265->sps = *sps.info;
+                    sps_by_id[sps.info->seq_parameter_set_id] = *sps.info;
                     analysis.summary.active_h265_sps = *sps.info;
                 } else {
                     nal.h265->sps_parse_error = sps.status.message();
@@ -140,8 +150,14 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                         slice_context.dependent_slice_segments_enabled_flag =
                             pps->second.dependent_slice_segments_enabled_flag;
                         slice_context.output_flag_present_flag = pps->second.output_flag_present_flag;
+                        const auto sps = sps_by_id.find(pps->second.seq_parameter_set_id);
+                        if (sps != sps_by_id.end()) {
+                            slice_context.log2_max_pic_order_cnt_lsb_minus4 =
+                                sps->second.log2_max_pic_order_cnt_lsb_minus4;
+                        }
                     }
                 }
+                slice_context.is_irap = h265_nal_type_is_irap(nal.h265->header.nal_unit_type);
 
                 const auto slice = bitstream::parse_h265_slice_header(
                     payload,

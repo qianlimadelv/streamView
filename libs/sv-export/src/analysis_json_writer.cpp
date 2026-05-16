@@ -59,6 +59,8 @@ void write_stream_summary_json(std::ostream& out, const analysis::StreamSummary&
         out << "      \"level_idc\": " << static_cast<int>(summary.active_h265_sps->level_idc) << ",\n";
         out << "      \"video_parameter_set_id\": " << summary.active_h265_sps->video_parameter_set_id << ",\n";
         out << "      \"seq_parameter_set_id\": " << summary.active_h265_sps->seq_parameter_set_id << ",\n";
+        out << "      \"log2_max_pic_order_cnt_lsb_minus4\": "
+            << summary.active_h265_sps->log2_max_pic_order_cnt_lsb_minus4 << ",\n";
         out << "      \"width\": " << summary.active_h265_sps->width << ",\n";
         out << "      \"height\": " << summary.active_h265_sps->height << "\n";
         out << "    }\n";
@@ -129,6 +131,7 @@ void write_h265_sps_json(std::ostream& out, const bitstream::H265SpsInfo& sps) {
     out << "          \"chroma_format_idc\": " << sps.chroma_format_idc << ",\n";
     out << "          \"bit_depth_luma\": " << static_cast<int>(sps.bit_depth_luma) << ",\n";
     out << "          \"bit_depth_chroma\": " << static_cast<int>(sps.bit_depth_chroma) << ",\n";
+    out << "          \"log2_max_pic_order_cnt_lsb_minus4\": " << sps.log2_max_pic_order_cnt_lsb_minus4 << ",\n";
     out << "          \"width\": " << sps.width << ",\n";
     out << "          \"height\": " << sps.height << ",\n";
     out << "          \"conformance_window_flag\": " << (sps.conformance_window_flag ? "true" : "false") << "\n";
@@ -173,6 +176,10 @@ void write_h265_slice_json(std::ostream& out, const bitstream::H265SliceHeaderIn
         out << ",\n";
         out << "          \"dependent_slice_segment_flag\": "
             << (slice.dependent_slice_segment_flag ? "true" : "false") << "\n";
+    }
+    if (slice.pic_order_cnt_lsb_present) {
+        out << ",\n";
+        out << "          \"pic_order_cnt_lsb\": " << slice.pic_order_cnt_lsb << "\n";
     }
     out << "        }\n";
 }
