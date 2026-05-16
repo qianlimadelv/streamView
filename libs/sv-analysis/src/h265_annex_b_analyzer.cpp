@@ -131,18 +131,21 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
             } else if (bitstream::h265_nal_type_is_vcl(nal.h265->header.nal_unit_type)) {
                 const auto payload = data.subspan(unit.payload_offset, unit.payload_size);
                 const auto slice_prefix = bitstream::parse_h265_slice_header(payload, nal.h265->header.nal_unit_type, std::nullopt);
-                std::optional<std::uint8_t> extra_slice_header_bits;
+                bitstream::H265SliceHeaderContext slice_context{};
                 if (slice_prefix.status.is_ok() && slice_prefix.info.has_value()) {
                     const auto pps = pps_by_id.find(slice_prefix.info->slice_pic_parameter_set_id);
                     if (pps != pps_by_id.end()) {
-                        extra_slice_header_bits = pps->second.num_extra_slice_header_bits;
+                        slice_context.num_extra_slice_header_bits = pps->second.num_extra_slice_header_bits;
+                        slice_context.dependent_slice_segments_enabled_flag =
+                            pps->second.dependent_slice_segments_enabled_flag;
+                        slice_context.output_flag_present_flag = pps->second.output_flag_present_flag;
                     }
                 }
 
                 const auto slice = bitstream::parse_h265_slice_header(
                     payload,
                     nal.h265->header.nal_unit_type,
-                    extra_slice_header_bits);
+                    slice_context);
                 if (slice.status.is_ok() && slice.info.has_value()) {
                     nal.h265->slice = *slice.info;
                     add_h265_slice_to_summary(analysis.summary, *slice.info);

@@ -388,6 +388,35 @@ void test_parses_h265_slice_header_prefix() {
     require(streamview::bitstream::h265_slice_kind_name(result.info->slice_kind) == "I", "H.265 slice kind name");
 }
 
+void test_parses_h265_slice_header_context_fields() {
+    TestBitWriter writer;
+    writer.write_bit(true);
+    writer.write_bit(false);
+    writer.write_ue(0);
+    writer.write_bits(0, 2);
+    writer.write_ue(2);
+    writer.write_bit(true);
+
+    auto rbsp = writer.finish_rbsp();
+    std::vector<std::uint8_t> slice{0x26, 0x01};
+    slice.insert(slice.end(), rbsp.begin(), rbsp.end());
+
+    const auto result = streamview::bitstream::parse_h265_slice_header(
+        slice,
+        streamview::bitstream::H265NalType::IdrWRadl,
+        streamview::bitstream::H265SliceHeaderContext{
+            .num_extra_slice_header_bits = 2,
+            .output_flag_present_flag = true,
+        });
+
+    require(result.status.is_ok(), "H.265 context slice parse status");
+    require(result.info.has_value(), "H.265 context slice info present");
+    require(result.info->slice_type_present, "H.265 context slice type present");
+    require(result.info->slice_kind == streamview::bitstream::H265SliceKind::I, "H.265 context slice kind");
+    require(result.info->pic_output_flag_present, "H.265 pic output flag present");
+    require(result.info->pic_output_flag, "H.265 pic output flag");
+}
+
 void test_parses_h265_pps_baseline_fields() {
     const std::vector<std::uint8_t> pps{0x44, 0x01, 0xc0};
 
@@ -442,6 +471,7 @@ int main() {
     test_parses_h265_sps_dimensions();
     test_parses_h265_pps_baseline_fields();
     test_parses_h265_slice_header_prefix();
+    test_parses_h265_slice_header_context_fields();
     test_rejects_truncated_h265_parameter_sets_and_slice();
     return 0;
 }

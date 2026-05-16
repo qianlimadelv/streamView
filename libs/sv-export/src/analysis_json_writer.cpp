@@ -160,9 +160,19 @@ void write_h265_slice_json(std::ostream& out, const bitstream::H265SliceHeaderIn
         out << "          \"slice_type_raw\": " << slice.slice_type_raw << ",\n";
         out << "          \"slice_type\": ";
         write_json_string(out, bitstream::h265_slice_kind_name(slice.slice_kind));
-        out << "\n";
+        if (slice.pic_output_flag_present) {
+            out << ",\n";
+            out << "          \"pic_output_flag\": " << (slice.pic_output_flag ? "true" : "false") << "\n";
+        } else {
+            out << "\n";
+        }
     } else {
         out << "\n";
+    }
+    if (slice.dependent_slice_segment_flag_present) {
+        out << ",\n";
+        out << "          \"dependent_slice_segment_flag\": "
+            << (slice.dependent_slice_segment_flag ? "true" : "false") << "\n";
     }
     out << "        }\n";
 }

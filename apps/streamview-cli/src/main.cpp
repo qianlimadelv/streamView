@@ -635,6 +635,16 @@ void write_nal_inspect_json(std::ostream& out,
                 out << "    \"slice_type\": ";
                 streamview::exporter::write_json_string(out, streamview::bitstream::h265_slice_kind_name(nal.h265->slice->slice_kind));
             }
+            if (nal.h265->slice->dependent_slice_segment_flag_present) {
+                out << ",\n";
+                out << "    \"dependent_slice_segment_flag\": "
+                    << (nal.h265->slice->dependent_slice_segment_flag ? "true" : "false");
+            }
+            if (nal.h265->slice->pic_output_flag_present) {
+                out << ",\n";
+                out << "    \"pic_output_flag\": "
+                    << (nal.h265->slice->pic_output_flag ? "true" : "false");
+            }
         }
     }
 

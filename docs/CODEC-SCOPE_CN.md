@@ -49,6 +49,7 @@
 - H.265 宽高推导
 - H.265 slice header 前缀字段
 - H.265 slice_type 基础解析
+- H.265 slice 上下文字段：`dependent_slice_segment_flag`、`pic_output_flag`
 - VCL NAL 计数
 - 畸形参数集和 slice 输入测试
 - CLI golden JSON 测试
@@ -58,6 +59,13 @@
 - H.265 VPS 完整字段解析
 - H.265 PPS 完整字段解析
 - H.265 POC 推导
+
+标准来源：
+
+- ITU-T H.265 7.3.2.2.1 Video parameter set RBSP syntax
+- ITU-T H.265 7.3.2.2.2 Sequence parameter set RBSP syntax
+- ITU-T H.265 7.3.2.3 Picture parameter set RBSP syntax
+- ITU-T H.265 7.3.6.1 General slice segment header syntax
 
 ## Parser 标准说明
 

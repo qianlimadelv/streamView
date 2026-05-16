@@ -49,6 +49,20 @@ Supported:
 - H.265 width/height derivation
 - H.265 slice header prefix fields
 - H.265 slice_type baseline parsing
+- H.265 contextual slice fields: `dependent_slice_segment_flag`, `pic_output_flag`
+
+Not yet supported:
+
+- H.265 VPS full field parsing
+- H.265 PPS full field parsing
+- H.265 POC derivation
+
+Standards:
+
+- ITU-T H.265 7.3.2.2.1 Video parameter set RBSP syntax
+- ITU-T H.265 7.3.2.2.2 Sequence parameter set RBSP syntax
+- ITU-T H.265 7.3.2.3 Picture parameter set RBSP syntax
+- ITU-T H.265 7.3.6.1 General slice segment header syntax
 
 ## Parser Standards Notes
 

@@ -24,6 +24,16 @@ struct H265SliceHeaderInfo {
     bool slice_type_present{};
     std::uint32_t slice_type_raw{};
     H265SliceKind slice_kind{H265SliceKind::B};
+    bool dependent_slice_segment_flag_present{};
+    bool dependent_slice_segment_flag{};
+    bool pic_output_flag_present{};
+    bool pic_output_flag{};
+};
+
+struct H265SliceHeaderContext {
+    std::optional<std::uint8_t> num_extra_slice_header_bits;
+    bool dependent_slice_segments_enabled_flag{};
+    bool output_flag_present_flag{};
 };
 
 struct H265SliceHeaderParseResult {
@@ -35,6 +45,11 @@ struct H265SliceHeaderParseResult {
     std::span<const std::uint8_t> nal_payload,
     H265NalType nal_unit_type,
     std::optional<std::uint8_t> num_extra_slice_header_bits);
+
+[[nodiscard]] H265SliceHeaderParseResult parse_h265_slice_header(
+    std::span<const std::uint8_t> nal_payload,
+    H265NalType nal_unit_type,
+    const H265SliceHeaderContext& context);
 
 [[nodiscard]] std::string_view h265_slice_kind_name(H265SliceKind kind);
 

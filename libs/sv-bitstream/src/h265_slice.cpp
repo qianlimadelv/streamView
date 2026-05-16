@@ -30,6 +30,18 @@ H265SliceHeaderParseResult parse_h265_slice_header(
     std::span<const std::uint8_t> nal_payload,
     H265NalType nal_unit_type,
     std::optional<std::uint8_t> num_extra_slice_header_bits) {
+    return parse_h265_slice_header(
+        nal_payload,
+        nal_unit_type,
+        H265SliceHeaderContext{
+            .num_extra_slice_header_bits = num_extra_slice_header_bits,
+        });
+}
+
+H265SliceHeaderParseResult parse_h265_slice_header(
+    std::span<const std::uint8_t> nal_payload,
+    H265NalType nal_unit_type,
+    const H265SliceHeaderContext& context) {
     if (nal_payload.size() < 3) {
         return {Status::parse_error("H.265 slice NAL payload is too small"), std::nullopt};
     }
@@ -59,8 +71,17 @@ H265SliceHeaderParseResult parse_h265_slice_header(
     }
     info.slice_pic_parameter_set_id = *slice_pic_parameter_set_id;
 
-    if (info.first_slice_segment_in_pic_flag && num_extra_slice_header_bits.has_value()) {
-        if (!reader.read_bits(*num_extra_slice_header_bits).has_value()) {
+    if (!info.first_slice_segment_in_pic_flag && context.dependent_slice_segments_enabled_flag) {
+        const auto dependent_slice_segment_flag = reader.read_bit();
+        if (!dependent_slice_segment_flag.has_value()) {
+            return {Status::parse_error("failed to read H.265 dependent_slice_segment_flag"), std::nullopt};
+        }
+        info.dependent_slice_segment_flag_present = true;
+        info.dependent_slice_segment_flag = *dependent_slice_segment_flag;
+    }
+
+    if (info.first_slice_segment_in_pic_flag && context.num_extra_slice_header_bits.has_value()) {
+        if (!reader.read_bits(*context.num_extra_slice_header_bits).has_value()) {
             return {Status::parse_error("failed to read H.265 extra slice header bits"), std::nullopt};
         }
 
@@ -75,6 +96,15 @@ H265SliceHeaderParseResult parse_h265_slice_header(
         info.slice_type_present = true;
         info.slice_type_raw = *slice_type_raw;
         info.slice_kind = *slice_kind;
+
+        if (context.output_flag_present_flag) {
+            const auto pic_output_flag = reader.read_bit();
+            if (!pic_output_flag.has_value()) {
+                return {Status::parse_error("failed to read H.265 pic_output_flag"), std::nullopt};
+            }
+            info.pic_output_flag_present = true;
+            info.pic_output_flag = *pic_output_flag;
+        }
     }
 
     return {Status::ok(), info};
