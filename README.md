@@ -21,6 +21,7 @@ product and engineering boundaries.
 - `docs/PRD_CN.md`
 - `docs/ARCHITECTURE_CN.md`
 - `docs/CODEC-SCOPE_CN.md`
+- `docs/BUILD_CN.md`
 - `docs/CLI_CN.md`
 - `docs/ROADMAP_CN.md`
 - `AGENTS_CN.md`

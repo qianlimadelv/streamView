@@ -37,6 +37,13 @@
 - PTS/DTS propagation
 - AVCC/HVCC conversion handling
 
+## Phase 4.5: Engineering
+
+- Linux GitHub Actions build/test
+- Windows/macOS build instructions
+- Release artifact structure
+- Real-stream summary regression set
+
 ## Phase 5: GUI Prototype
 
 - Qt 6 main window

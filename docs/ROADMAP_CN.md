@@ -51,6 +51,13 @@
 - PTS/DTS 传递
 - AVCC/HVCC 转换处理
 
+## Phase 4.5：工程化
+
+- Linux GitHub Actions build/test
+- Windows/macOS 构建说明
+- Release artifact 结构定义
+- 真实码流 summary 回归集
+
 ## Phase 5：GUI 原型
 
 - Qt 6 主窗口
