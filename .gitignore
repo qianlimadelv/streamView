@@ -7,6 +7,7 @@ Testing/
 *.swo
 compile_commands.json
 out.json
+out/
 *.actual.json
 *.log
 cmake-build-*/

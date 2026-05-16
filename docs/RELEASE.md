@@ -43,3 +43,11 @@ cmake --build build --config Release --parallel
 ctest --test-dir build --output-on-failure
 ./build/apps/streamview-cli/streamview --version
 ```
+
+## Local Install Staging
+
+Use CMake install with a local prefix to inspect release contents:
+
+```bash
+cmake --install build --prefix out/install
+```

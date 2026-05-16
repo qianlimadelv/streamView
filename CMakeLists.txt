@@ -36,3 +36,21 @@ if(STREAMVIEW_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+install(FILES
+    README.md
+    LICENSE
+    DESTINATION .
+)
+
+install(FILES
+    docs/BUILD.md
+    docs/BUILD_CN.md
+    docs/CLI.md
+    docs/CLI_CN.md
+    docs/CODEC-SCOPE.md
+    docs/CODEC-SCOPE_CN.md
+    docs/RELEASE.md
+    docs/RELEASE_CN.md
+    DESTINATION docs
+)

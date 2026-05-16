@@ -43,3 +43,11 @@ cmake --build build --config Release --parallel
 ctest --test-dir build --output-on-failure
 ./build/apps/streamview-cli/streamview --version
 ```
+
+## 本地安装产物检查
+
+可以用 CMake install 安装到本地目录，检查发布内容：
+
+```bash
+cmake --install build --prefix out/install
+```
