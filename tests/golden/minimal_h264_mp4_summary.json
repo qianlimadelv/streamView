@@ -4,6 +4,39 @@
   "input": "tests/samples/mp4/minimal_h264.mp4",
   "size_bytes": 48,
   "nal_count": 3,
+  "container": {
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+    "format_long_name": "QuickTime / MOV",
+    "stream_index": 0,
+    "stream_codec_name": "h264",
+    "stream_codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+    "time_base": {
+      "num": 1,
+      "den": 1200000
+    },
+    "duration_ts": 48000,
+    "start_time_ts": 0,
+    "width": 640,
+    "height": 360,
+    "bit_rate": 9000,
+    "avg_frame_rate": {
+      "num": 25,
+      "den": 1
+    },
+    "r_frame_rate": {
+      "num": 25,
+      "den": 1
+    },
+    "packet_count": 1,
+    "first_packet": {
+      "index": 0,
+      "pts": 0,
+      "dts": 0,
+      "duration": 48000,
+      "position": 48,
+      "keyframe": true
+    }
+  },
   "stream_summary": {
     "vps_count": 0,
     "sps_count": 1,
@@ -35,6 +68,7 @@
     }
   },
   "frames_omitted": 1,
+  "timeline_omitted": 1,
   "gops_omitted": 1,
   "nals_omitted": 3
 }

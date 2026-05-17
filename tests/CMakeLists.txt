@@ -429,6 +429,23 @@ set_tests_properties(streamview-cli-json-summary-h265-minimal
 )
 
 add_test(
+    NAME streamview-cli-json-full-mp4-h264
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+        -DSTREAMVIEW_SAMPLE=tests/samples/mp4/minimal_h264.mp4
+        -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/minimal_h264_mp4_full.json
+        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/minimal_h264_mp4_full.actual.json
+        -DSTREAMVIEW_JSON_MODE=full
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
+)
+
+set_tests_properties(streamview-cli-json-full-mp4-h264
+    PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+add_test(
     NAME streamview-cli-json-summary-mp4-h265
     COMMAND
         ${CMAKE_COMMAND}

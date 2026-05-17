@@ -54,9 +54,30 @@
       "is_keyframe": true,
       "poc": null,
       "gop_index": 0,
+      "container_packet_index": null,
+      "pts": null,
+      "dts": null,
+      "duration": null,
+      "packet_position": null,
       "size_bytes": 6,
       "first_payload_offset": 57,
       "nal_indices": [3]
+    }
+  ],
+  "timeline": [
+    {
+      "timeline_index": 0,
+      "frame_index": 0,
+      "decode_order_index": 0,
+      "gop_index": 0,
+      "container_packet_index": null,
+      "pts": null,
+      "dts": null,
+      "duration": null,
+      "packet_position": null,
+      "codec": "h265",
+      "frame_type": "I",
+      "is_keyframe": true
     }
   ],
   "gops": [

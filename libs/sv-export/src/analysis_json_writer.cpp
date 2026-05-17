@@ -8,6 +8,107 @@
 namespace streamview::exporter {
 namespace {
 
+void write_optional_int64_field(std::ostream& out, std::optional<std::int64_t> value) {
+    if (value.has_value()) {
+        out << *value;
+    } else {
+        out << "null";
+    }
+}
+
+void write_time_base_json(std::ostream& out, int num, int den) {
+    out << "{\n";
+    out << "      \"num\": " << num << ",\n";
+    out << "      \"den\": " << den << "\n";
+    out << "    }";
+}
+
+void write_packet_timing_json(std::ostream& out, const analysis::ContainerPacketTiming& packet) {
+    out << "{\n";
+    out << "      \"index\": " << packet.index << ",\n";
+    out << "      \"pts\": ";
+    write_optional_int64_field(out, packet.pts);
+    out << ",\n";
+    out << "      \"dts\": ";
+    write_optional_int64_field(out, packet.dts);
+    out << ",\n";
+    out << "      \"duration\": ";
+    write_optional_int64_field(out, packet.duration);
+    out << ",\n";
+    out << "      \"position\": ";
+    write_optional_int64_field(out, packet.position);
+    out << ",\n";
+    out << "      \"keyframe\": " << (packet.keyframe ? "true" : "false") << "\n";
+    out << "    }";
+}
+
+void write_container_json(std::ostream& out, const analysis::ContainerMetadata& container, AnalysisJsonMode mode) {
+    out << "  \"container\": {\n";
+    out << "    \"format_name\": ";
+    write_json_string(out, container.container_format_name);
+    out << ",\n";
+    out << "    \"format_long_name\": ";
+    if (container.container_format_long_name.has_value()) {
+        write_json_string(out, *container.container_format_long_name);
+    } else {
+        out << "null";
+    }
+    out << ",\n";
+    out << "    \"stream_index\": " << container.stream_index << ",\n";
+    out << "    \"stream_codec_name\": ";
+    write_json_string(out, container.stream_codec_name);
+    out << ",\n";
+    out << "    \"stream_codec_long_name\": ";
+    if (container.stream_codec_long_name.has_value()) {
+        write_json_string(out, *container.stream_codec_long_name);
+    } else {
+        out << "null";
+    }
+    out << ",\n";
+    out << "    \"time_base\": ";
+    write_time_base_json(out, container.time_base_num, container.time_base_den);
+    out << ",\n";
+    out << "    \"duration_ts\": ";
+    write_optional_int64_field(out, container.duration_ts);
+    out << ",\n";
+    out << "    \"start_time_ts\": ";
+    write_optional_int64_field(out, container.start_time_ts);
+    out << ",\n";
+    out << "    \"width\": " << container.width << ",\n";
+    out << "    \"height\": " << container.height << ",\n";
+    out << "    \"bit_rate\": " << container.bit_rate << ",\n";
+    out << "    \"avg_frame_rate\": ";
+    write_time_base_json(out, container.avg_frame_rate_num, container.avg_frame_rate_den);
+    out << ",\n";
+    out << "    \"r_frame_rate\": ";
+    write_time_base_json(out, container.r_frame_rate_num, container.r_frame_rate_den);
+    out << ",\n";
+    out << "    \"packet_count\": " << container.packets.size();
+
+    if (mode == AnalysisJsonMode::Summary) {
+        if (!container.packets.empty()) {
+            out << ",\n";
+            out << "    \"first_packet\": ";
+            write_packet_timing_json(out, container.packets.front());
+        } else {
+            out << "\n";
+        }
+        out << "\n";
+        out << "  },\n";
+        return;
+    }
+
+    out << ",\n";
+    out << "    \"packets\": [\n";
+    for (std::size_t i = 0; i < container.packets.size(); ++i) {
+        out << "    ";
+        write_packet_timing_json(out, container.packets[i]);
+        out << (i + 1 == container.packets.size() ? "\n" : ",\n");
+    }
+    out << "    ]\n";
+    out << "  },\n";
+}
+
 void write_stream_summary_json(std::ostream& out, const analysis::StreamSummary& summary) {
     out << "  \"stream_summary\": {\n";
     out << "    \"vps_count\": " << summary.vps_count << ",\n";
@@ -332,6 +433,41 @@ void write_frames_json(std::ostream& out, const std::vector<analysis::FrameAnaly
             out << "null";
         }
         out << ",\n";
+        out << "      \"container_packet_index\": ";
+        if (frame.container_packet_index.has_value()) {
+            out << *frame.container_packet_index;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"pts\": ";
+        if (frame.pts.has_value()) {
+            out << *frame.pts;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"dts\": ";
+        if (frame.dts.has_value()) {
+            out << *frame.dts;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"duration\": ";
+        if (frame.duration.has_value()) {
+            out << *frame.duration;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"packet_position\": ";
+        if (frame.packet_position.has_value()) {
+            out << *frame.packet_position;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
         out << "      \"size_bytes\": " << frame.size_bytes << ",\n";
         out << "      \"first_payload_offset\": " << frame.first_payload_offset << ",\n";
         out << "      \"nal_indices\": [";
@@ -340,6 +476,68 @@ void write_frames_json(std::ostream& out, const std::vector<analysis::FrameAnaly
         }
         out << "]\n";
         out << "    }" << (i + 1 == frames.size() ? "\n" : ",\n");
+    }
+    out << "  ],\n";
+}
+
+void write_timeline_json(std::ostream& out, const std::vector<analysis::TimelineEntry>& timeline) {
+    out << "  \"timeline\": [\n";
+    for (std::size_t i = 0; i < timeline.size(); ++i) {
+        const auto& entry = timeline[i];
+        out << "    {\n";
+        out << "      \"timeline_index\": " << entry.timeline_index << ",\n";
+        out << "      \"frame_index\": " << entry.frame_index << ",\n";
+        out << "      \"decode_order_index\": " << entry.decode_order_index << ",\n";
+        out << "      \"gop_index\": ";
+        if (entry.gop_index.has_value()) {
+            out << *entry.gop_index;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"container_packet_index\": ";
+        if (entry.container_packet_index.has_value()) {
+            out << *entry.container_packet_index;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"pts\": ";
+        if (entry.pts.has_value()) {
+            out << *entry.pts;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"dts\": ";
+        if (entry.dts.has_value()) {
+            out << *entry.dts;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"duration\": ";
+        if (entry.duration.has_value()) {
+            out << *entry.duration;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"packet_position\": ";
+        if (entry.packet_position.has_value()) {
+            out << *entry.packet_position;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"codec\": ";
+        write_json_string(out, entry.codec);
+        out << ",\n";
+        out << "      \"frame_type\": ";
+        write_json_string(out, entry.frame_type);
+        out << ",\n";
+        out << "      \"is_keyframe\": " << (entry.is_keyframe ? "true" : "false") << "\n";
+        out << "    }" << (i + 1 == timeline.size() ? "\n" : ",\n");
     }
     out << "  ],\n";
 }
@@ -376,9 +574,13 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
     out << ",\n";
     out << "  \"size_bytes\": " << analysis.size_bytes << ",\n";
     out << "  \"nal_count\": " << analysis.nals.size() << ",\n";
+    if (analysis.container.has_value()) {
+        write_container_json(out, *analysis.container, options.mode);
+    }
     write_stream_summary_json(out, analysis.summary);
     if (options.mode == AnalysisJsonMode::Summary) {
         out << "  \"frames_omitted\": " << analysis.frames.size() << ",\n";
+        out << "  \"timeline_omitted\": " << analysis.timeline.size() << ",\n";
         out << "  \"gops_omitted\": " << analysis.gops.size() << ",\n";
         out << "  \"nals_omitted\": " << analysis.nals.size() << "\n";
         out << "}\n";
@@ -386,6 +588,7 @@ void write_analysis_json(std::ostream& out, const analysis::StreamAnalysis& anal
     }
 
     write_frames_json(out, analysis.frames);
+    write_timeline_json(out, analysis.timeline);
     write_gops_json(out, analysis.gops);
     out << "  \"nals\": [\n";
 

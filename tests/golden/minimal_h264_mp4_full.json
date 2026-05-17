@@ -1,9 +1,44 @@
 {
   "format": "annex_b",
   "codec_guess": "h264",
-  "input": "tests/samples/h264/minimal_sps_pps_idr.h264",
-  "size_bytes": 43,
+  "input": "tests/samples/mp4/minimal_h264.mp4",
+  "size_bytes": 48,
   "nal_count": 3,
+  "container": {
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+    "format_long_name": "QuickTime / MOV",
+    "stream_index": 0,
+    "stream_codec_name": "h264",
+    "stream_codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+    "time_base": {
+      "num": 1,
+      "den": 1200000
+    },
+    "duration_ts": 48000,
+    "start_time_ts": 0,
+    "width": 640,
+    "height": 360,
+    "bit_rate": 9000,
+    "avg_frame_rate": {
+      "num": 25,
+      "den": 1
+    },
+    "r_frame_rate": {
+      "num": 25,
+      "den": 1
+    },
+    "packet_count": 1,
+    "packets": [
+    {
+      "index": 0,
+      "pts": 0,
+      "dts": 0,
+      "duration": 48000,
+      "position": 48,
+      "keyframe": true
+    }
+    ]
+  },
   "stream_summary": {
     "vps_count": 0,
     "sps_count": 1,
@@ -43,13 +78,13 @@
       "is_keyframe": true,
       "poc": null,
       "gop_index": 0,
-      "container_packet_index": null,
-      "pts": null,
-      "dts": null,
-      "duration": null,
-      "packet_position": null,
+      "container_packet_index": 0,
+      "pts": 0,
+      "dts": 0,
+      "duration": 48000,
+      "packet_position": 48,
       "size_bytes": 6,
-      "first_payload_offset": 40,
+      "first_payload_offset": 45,
       "nal_indices": [2]
     }
   ],
@@ -59,11 +94,11 @@
       "frame_index": 0,
       "decode_order_index": 0,
       "gop_index": 0,
-      "container_packet_index": null,
-      "pts": null,
-      "dts": null,
-      "duration": null,
-      "packet_position": null,
+      "container_packet_index": 0,
+      "pts": 0,
+      "dts": 0,
+      "duration": 48000,
+      "packet_position": 48,
       "codec": "h264",
       "frame_type": "I",
       "is_keyframe": true
@@ -83,9 +118,9 @@
   "nals": [
     {
       "index": 0,
-      "start_code_offset": 0,
+      "start_code_offset": 4,
       "start_code_size": 4,
-      "payload_offset": 4,
+      "payload_offset": 8,
       "payload_size": 26,
       "h264": {
         "forbidden_zero_bit": 0,
@@ -112,9 +147,9 @@
     },
     {
       "index": 1,
-      "start_code_offset": 30,
-      "start_code_size": 3,
-      "payload_offset": 33,
+      "start_code_offset": 34,
+      "start_code_size": 4,
+      "payload_offset": 38,
       "payload_size": 4,
       "h264": {
         "forbidden_zero_bit": 0,
@@ -132,9 +167,9 @@
     },
     {
       "index": 2,
-      "start_code_offset": 37,
+      "start_code_offset": 42,
       "start_code_size": 3,
-      "payload_offset": 40,
+      "payload_offset": 45,
       "payload_size": 3,
       "h264": {
         "forbidden_zero_bit": 0,

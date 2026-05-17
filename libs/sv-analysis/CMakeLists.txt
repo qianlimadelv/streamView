@@ -2,6 +2,7 @@ add_library(sv-analysis
     src/gop_builder.cpp
     src/h264_annex_b_analyzer.cpp
     src/h265_annex_b_analyzer.cpp
+    src/timeline_builder.cpp
     src/validation.cpp
 )
 

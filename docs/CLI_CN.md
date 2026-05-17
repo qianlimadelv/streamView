@@ -4,7 +4,8 @@
 对象检查和错误排查做成可测试、可脚本化的工具链。
 
 它可以直接处理 raw Annex B 输入；如果编译时启用了 FFmpeg demux，还能处理
-MP4 输入。
+MP4 输入。对 MP4 输入，JSON 输出还会带上 FFmpeg 提供的容器元数据和 packet
+时间戳信息。
 
 ## 命令
 
@@ -32,7 +33,9 @@ streamview dump <input> --nal <index> [--format hex|payload|rbsp] [--output <pat
 
 `inspect` 输出单个 NAL、frame 或 GOP 的 JSON。NAL inspect 会尽量输出当前已解析
 的 codec syntax 字段、parse error 文本以及引用该 NAL 的 frame 索引。Frame
-inspect 会输出所属 GOP 索引。
+inspect 会输出所属 GOP 索引。对 MP4 输入，frame 和顶层 JSON 还会带上容器 packet
+的时间戳字段，例如 `pts`、`dts`、`duration` 和 packet 位置。full JSON 还会输出
+一个按展示顺序排序的 `timeline` 数组，方便后续 UI 直接消费。
 
 ## Errors
 

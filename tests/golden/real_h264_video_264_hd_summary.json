@@ -35,6 +35,7 @@
     }
   },
   "frames_omitted": 3545,
+  "timeline_omitted": 3545,
   "gops_omitted": 48,
   "nals_omitted": 3628
 }

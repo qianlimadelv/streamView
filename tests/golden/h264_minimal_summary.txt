@@ -3,6 +3,8 @@ Input: tests/samples/h264/minimal_sps_pps_idr.h264
 Format: annex_b
 Codec: h264
 Size bytes: 43
+Timeline entries: 1
+First timeline frame: index=0, pts=null, dts=null, type=I
 NAL units: 3
 Frames: 1
 Keyframes: 1

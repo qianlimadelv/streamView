@@ -5,7 +5,8 @@ on reproducible stream analysis, machine-readable export, and small scoped
 inspection commands.
 
 It accepts raw Annex B inputs directly, and MP4 inputs when FFmpeg demux support
-is built in.
+is built in. When MP4 input is used, JSON output also includes container
+metadata and packet timing information from FFmpeg.
 
 ## Commands
 
@@ -35,6 +36,10 @@ streamview dump <input> --nal <index> [--format hex|payload|rbsp] [--output <pat
 `inspect` prints JSON for one selected NAL, frame, or GOP. NAL inspect includes
 available codec syntax fields, parse error text when present, and frame indices
 that reference the NAL. Frame inspect includes the owning GOP index when known.
+When the input comes from MP4, frame and top-level JSON output also include
+container packet timing fields such as `pts`, `dts`, `duration`, and packet
+position. The full JSON output also includes a `timeline` array sorted by
+presentation order when timing information is available.
 
 ## Errors
 

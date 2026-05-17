@@ -4,6 +4,39 @@
   "input": "tests/samples/mp4/short_h265.mp4",
   "size_bytes": 7154275,
   "nal_count": 194,
+  "container": {
+    "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+    "format_long_name": "QuickTime / MOV",
+    "stream_index": 0,
+    "stream_codec_name": "hevc",
+    "stream_codec_long_name": "H.265 / HEVC (High Efficiency Video Coding)",
+    "time_base": {
+      "num": 1,
+      "den": 19200
+    },
+    "duration_ts": 19872,
+    "start_time_ts": 0,
+    "width": 3840,
+    "height": 2160,
+    "bit_rate": 55295265,
+    "avg_frame_rate": {
+      "num": 12400,
+      "den": 207
+    },
+    "r_frame_rate": {
+      "num": 60000,
+      "den": 1001
+    },
+    "packet_count": 62,
+    "first_packet": {
+      "index": 0,
+      "pts": 0,
+      "dts": -672,
+      "duration": 320,
+      "position": 54,
+      "keyframe": true
+    }
+  },
   "stream_summary": {
     "vps_count": 2,
     "sps_count": 2,
@@ -46,6 +79,7 @@
     }
   },
   "frames_omitted": 62,
+  "timeline_omitted": 62,
   "gops_omitted": 2,
   "nals_omitted": 194
 }

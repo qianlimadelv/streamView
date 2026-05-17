@@ -531,6 +531,54 @@ void test_validates_h265_resolution_change_detection() {
             "H.265 resolution change validation issue");
 }
 
+void test_builds_timeline_from_frame_timestamps() {
+    streamview::analysis::StreamAnalysis analysis{};
+    analysis.input_path = "timeline.mp4";
+    analysis.codec_guess = "h264";
+    analysis.frames.push_back({
+        .index = 0,
+        .decode_order_index = 0,
+        .gop_index = 0,
+        .container_packet_index = 0,
+        .pts = 20,
+        .dts = 10,
+        .duration = 5,
+        .packet_position = 100,
+        .codec = "h264",
+        .frame_type = "B",
+        .is_keyframe = false,
+        .poc = std::nullopt,
+        .nal_indices = {0},
+        .size_bytes = 10,
+        .first_payload_offset = 0,
+    });
+    analysis.frames.push_back({
+        .index = 1,
+        .decode_order_index = 1,
+        .gop_index = 0,
+        .container_packet_index = 1,
+        .pts = 10,
+        .dts = 0,
+        .duration = 5,
+        .packet_position = 50,
+        .codec = "h264",
+        .frame_type = "I",
+        .is_keyframe = true,
+        .poc = std::nullopt,
+        .nal_indices = {1},
+        .size_bytes = 10,
+        .first_payload_offset = 0,
+    });
+
+    streamview::analysis::build_timeline(analysis);
+
+    require(analysis.timeline.size() == 2, "timeline size");
+    require(analysis.timeline[0].frame_index == 1, "timeline sorts by pts");
+    require(analysis.timeline[0].timeline_index == 0, "timeline first index");
+    require(analysis.timeline[1].frame_index == 0, "timeline second frame");
+    require(analysis.timeline[1].timeline_index == 1, "timeline second index");
+}
+
 void test_records_h264_parse_errors_without_frames() {
     const std::vector<std::uint8_t> stream{
         0x00, 0x00, 0x01,
@@ -604,6 +652,7 @@ int main() {
     test_validates_frame_gop_consistency();
     test_validates_resolution_change_detection();
     test_validates_h265_resolution_change_detection();
+    test_builds_timeline_from_frame_timestamps();
     test_records_h264_parse_errors_without_frames();
     test_records_h265_parse_errors_without_crashing();
     return 0;

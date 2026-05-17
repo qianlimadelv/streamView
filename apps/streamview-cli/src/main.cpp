@@ -103,6 +103,7 @@ struct DumpOptions {
 struct InputData {
     std::vector<std::uint8_t> bytes;
     std::optional<CodecOverride> codec_hint;
+    std::optional<streamview::analysis::ContainerMetadata> container;
 };
 
 struct ParseDumpArgsResult {
@@ -403,7 +404,7 @@ std::optional<InputData> load_input_data(const std::string& path) {
         if (!data.has_value()) {
             return std::nullopt;
         }
-        return InputData{.bytes = std::move(*data), .codec_hint = codec};
+        return InputData{.bytes = std::move(*data), .codec_hint = codec, .container = std::nullopt};
     }
 
     if (has_extension(path, ".mp4")) {
@@ -413,10 +414,41 @@ std::optional<InputData> load_input_data(const std::string& path) {
             std::cerr << "streamview: failed to demux MP4: " << demux.status.message() << "\n";
             return std::nullopt;
         }
+        streamview::analysis::ContainerMetadata container{};
+        if (demux.stream.has_value()) {
+            container.container_format_name = demux.stream->container_format_name;
+            container.container_format_long_name = demux.stream->container_format_long_name;
+            container.stream_codec_name = demux.stream->stream_codec_name;
+            container.stream_codec_long_name = demux.stream->stream_codec_long_name;
+            container.stream_index = demux.stream->stream_index;
+            container.time_base_num = demux.stream->time_base_num;
+            container.time_base_den = demux.stream->time_base_den;
+            container.duration_ts = demux.stream->duration_ts;
+            container.start_time_ts = demux.stream->start_time_ts;
+            container.width = demux.stream->width;
+            container.height = demux.stream->height;
+            container.bit_rate = demux.stream->bit_rate;
+            container.avg_frame_rate_num = demux.stream->avg_frame_rate_num;
+            container.avg_frame_rate_den = demux.stream->avg_frame_rate_den;
+            container.r_frame_rate_num = demux.stream->r_frame_rate_num;
+            container.r_frame_rate_den = demux.stream->r_frame_rate_den;
+        }
+        container.packets.reserve(demux.packets.size());
+        for (const auto& packet : demux.packets) {
+            container.packets.push_back(streamview::analysis::ContainerPacketTiming{
+                .index = packet.index,
+                .pts = packet.pts,
+                .dts = packet.dts,
+                .duration = packet.duration,
+                .position = packet.position,
+                .keyframe = packet.keyframe,
+            });
+        }
         return InputData{
             .bytes = std::move(demux.annex_b),
             .codec_hint = demux.codec == streamview::demux::DemuxCodec::H265 ? CodecOverride::H265
                                                                             : CodecOverride::H264,
+            .container = std::move(container),
         };
 #else
         std::cerr << "streamview: MP4 input requires FFmpeg development libraries at build time\n";
@@ -428,7 +460,27 @@ std::optional<InputData> load_input_data(const std::string& path) {
     if (!data.has_value()) {
         return std::nullopt;
     }
-    return InputData{.bytes = std::move(*data), .codec_hint = std::nullopt};
+    return InputData{.bytes = std::move(*data), .codec_hint = std::nullopt, .container = std::nullopt};
+}
+
+void attach_container_timing(streamview::analysis::StreamAnalysis& analysis) {
+    if (!analysis.container.has_value()) {
+        return;
+    }
+    const auto& container = *analysis.container;
+    if (container.packets.size() != analysis.frames.size()) {
+        return;
+    }
+
+    for (std::size_t i = 0; i < analysis.frames.size(); ++i) {
+        auto& frame = analysis.frames[i];
+        const auto& packet = container.packets[i];
+        frame.container_packet_index = packet.index;
+        frame.pts = packet.pts;
+        frame.dts = packet.dts;
+        frame.duration = packet.duration;
+        frame.packet_position = packet.position;
+    }
 }
 
 std::optional<streamview::analysis::StreamAnalysis> analyze_input(const std::string& input_path,
@@ -442,9 +494,17 @@ std::optional<streamview::analysis::StreamAnalysis> analyze_input(const std::str
     const auto resolved_codec = codec == CodecOverride::Auto && input->codec_hint.has_value() ? *input->codec_hint
                                                                                               : codec;
     if (resolved_codec == CodecOverride::H265) {
-        return streamview::analysis::analyze_h265_annex_b(input_path, input->bytes);
+        auto analysis = streamview::analysis::analyze_h265_annex_b(input_path, input->bytes);
+        analysis.container = input->container;
+        attach_container_timing(analysis);
+        streamview::analysis::build_timeline(analysis);
+        return analysis;
     }
-    return streamview::analysis::analyze_h264_annex_b(input_path, input->bytes);
+    auto analysis = streamview::analysis::analyze_h264_annex_b(input_path, input->bytes);
+    analysis.container = input->container;
+    attach_container_timing(analysis);
+    streamview::analysis::build_timeline(analysis);
+    return analysis;
 }
 
 void write_text_summary(std::ostream& out, const streamview::analysis::StreamAnalysis& analysis) {
@@ -453,6 +513,74 @@ void write_text_summary(std::ostream& out, const streamview::analysis::StreamAna
     out << "Format: " << analysis.format << "\n";
     out << "Codec: " << analysis.codec_guess << "\n";
     out << "Size bytes: " << analysis.size_bytes << "\n";
+    if (analysis.container.has_value()) {
+        out << "Container: " << analysis.container->container_format_name;
+        if (analysis.container->container_format_long_name.has_value()) {
+            out << " (" << *analysis.container->container_format_long_name << ")";
+        }
+        out << "\n";
+        out << "Stream index: " << analysis.container->stream_index << "\n";
+        out << "Stream codec: " << analysis.container->stream_codec_name;
+        if (analysis.container->stream_codec_long_name.has_value()) {
+            out << " (" << *analysis.container->stream_codec_long_name << ")";
+        }
+        out << "\n";
+        out << "Time base: " << analysis.container->time_base_num << "/" << analysis.container->time_base_den
+            << "\n";
+        if (analysis.container->duration_ts.has_value()) {
+            out << "Duration ts: " << *analysis.container->duration_ts << "\n";
+        }
+        if (analysis.container->start_time_ts.has_value()) {
+            out << "Start time ts: " << *analysis.container->start_time_ts << "\n";
+        }
+        out << "Frame rate: " << analysis.container->avg_frame_rate_num << "/"
+            << analysis.container->avg_frame_rate_den << " (r=" << analysis.container->r_frame_rate_num << "/"
+            << analysis.container->r_frame_rate_den << ")\n";
+        out << "Resolution (container): " << analysis.container->width << "x" << analysis.container->height
+            << "\n";
+        out << "Bit rate (container): " << analysis.container->bit_rate << "\n";
+        out << "Packet count: " << analysis.container->packets.size() << "\n";
+        if (!analysis.container->packets.empty()) {
+            const auto& packet = analysis.container->packets.front();
+            out << "First packet: pts=";
+            if (packet.pts.has_value()) {
+                out << *packet.pts;
+            } else {
+                out << "null";
+            }
+            out << ", dts=";
+            if (packet.dts.has_value()) {
+                out << *packet.dts;
+            } else {
+                out << "null";
+            }
+            out << ", duration=";
+            if (packet.duration.has_value()) {
+                out << *packet.duration;
+            } else {
+                out << "null";
+            }
+            out << ", keyframe=" << (packet.keyframe ? "true" : "false") << "\n";
+        }
+    }
+    if (!analysis.timeline.empty()) {
+        const auto& first_timeline = analysis.timeline.front();
+        out << "Timeline entries: " << analysis.timeline.size() << "\n";
+        out << "First timeline frame: index=" << first_timeline.frame_index
+            << ", pts=";
+        if (first_timeline.pts.has_value()) {
+            out << *first_timeline.pts;
+        } else {
+            out << "null";
+        }
+        out << ", dts=";
+        if (first_timeline.dts.has_value()) {
+            out << *first_timeline.dts;
+        } else {
+            out << "null";
+        }
+        out << ", type=" << first_timeline.frame_type << "\n";
+    }
     out << "NAL units: " << analysis.nals.size() << "\n";
     out << "Frames: " << analysis.summary.frame_count << "\n";
     out << "Keyframes: " << analysis.summary.keyframe_count << "\n";
@@ -705,6 +833,41 @@ void write_frame_inspect_json(std::ostream& out,
     out << "    \"gop_index\": ";
     if (frame.gop_index.has_value()) {
         out << *frame.gop_index;
+    } else {
+        out << "null";
+    }
+    out << ",\n";
+    out << "    \"container_packet_index\": ";
+    if (frame.container_packet_index.has_value()) {
+        out << *frame.container_packet_index;
+    } else {
+        out << "null";
+    }
+    out << ",\n";
+    out << "    \"pts\": ";
+    if (frame.pts.has_value()) {
+        out << *frame.pts;
+    } else {
+        out << "null";
+    }
+    out << ",\n";
+    out << "    \"dts\": ";
+    if (frame.dts.has_value()) {
+        out << *frame.dts;
+    } else {
+        out << "null";
+    }
+    out << ",\n";
+    out << "    \"duration\": ";
+    if (frame.duration.has_value()) {
+        out << *frame.duration;
+    } else {
+        out << "null";
+    }
+    out << ",\n";
+    out << "    \"packet_position\": ";
+    if (frame.packet_position.has_value()) {
+        out << *frame.packet_position;
     } else {
         out << "null";
     }

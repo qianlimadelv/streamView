@@ -84,6 +84,11 @@ struct FrameAnalysis {
     std::size_t index{};
     std::size_t decode_order_index{};
     std::optional<std::size_t> gop_index;
+    std::optional<std::size_t> container_packet_index;
+    std::optional<std::int64_t> pts;
+    std::optional<std::int64_t> dts;
+    std::optional<std::int64_t> duration;
+    std::optional<std::int64_t> packet_position;
     std::string codec;
     std::string frame_type;
     bool is_keyframe{};
@@ -103,19 +108,66 @@ struct GopAnalysis {
     bool starts_with_keyframe{};
 };
 
+struct ContainerPacketTiming {
+    std::size_t index{};
+    std::optional<std::int64_t> pts;
+    std::optional<std::int64_t> dts;
+    std::optional<std::int64_t> duration;
+    std::optional<std::int64_t> position;
+    bool keyframe{};
+};
+
+struct ContainerMetadata {
+    std::string container_format_name;
+    std::optional<std::string> container_format_long_name;
+    std::string stream_codec_name;
+    std::optional<std::string> stream_codec_long_name;
+    std::size_t stream_index{};
+    int time_base_num{};
+    int time_base_den{};
+    std::optional<std::int64_t> duration_ts;
+    std::optional<std::int64_t> start_time_ts;
+    int width{};
+    int height{};
+    std::int64_t bit_rate{};
+    int avg_frame_rate_num{};
+    int avg_frame_rate_den{};
+    int r_frame_rate_num{};
+    int r_frame_rate_den{};
+    std::vector<ContainerPacketTiming> packets;
+};
+
+struct TimelineEntry {
+    std::size_t timeline_index{};
+    std::size_t frame_index{};
+    std::size_t decode_order_index{};
+    std::optional<std::size_t> gop_index;
+    std::optional<std::size_t> container_packet_index;
+    std::optional<std::int64_t> pts;
+    std::optional<std::int64_t> dts;
+    std::optional<std::int64_t> duration;
+    std::optional<std::int64_t> packet_position;
+    std::string codec;
+    std::string frame_type;
+    bool is_keyframe{};
+};
+
 struct StreamAnalysis {
     std::string input_path;
     std::string format{"annex_b"};
     std::string codec_guess{"h264"};
     std::size_t size_bytes{};
+    std::optional<ContainerMetadata> container;
     StreamSummary summary;
     std::vector<NalAnalysis> nals;
     std::vector<FrameAnalysis> frames;
+    std::vector<TimelineEntry> timeline;
     std::vector<GopAnalysis> gops;
 };
 
 [[nodiscard]] StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std::uint8_t> data);
 [[nodiscard]] StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std::uint8_t> data);
 void build_gops(StreamAnalysis& analysis);
+void build_timeline(StreamAnalysis& analysis);
 
 } // namespace streamview::analysis
