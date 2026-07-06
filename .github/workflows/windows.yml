@@ -16,29 +16,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pkg-config
-        run: choco install pkgconfiglite -y --no-progress
-
-      - name: Fetch FFmpeg (shared dev build)
+      - name: Fetch FFmpeg (BtbN shared build)
         shell: pwsh
         run: |
-          $url = "https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-full_build-shared.7z"
-          curl.exe -L -o ffmpeg.7z $url
-          7z x ffmpeg.7z -offmpeg | Out-Null
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip"
+          curl.exe -L -o ffmpeg.zip $url
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
           $dir = (Get-ChildItem ffmpeg -Directory | Select-Object -First 1).FullName
           "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
-          # gyan .pc files carry a build-time prefix; repoint them at the extracted dir
-          $pcp = Join-Path $dir "lib\pkgconfig"
-          $fwd = $dir -replace '\\','/'
-          Get-ChildItem "$pcp\*.pc" | ForEach-Object {
-            (Get-Content $_) -replace '^prefix=.*', "prefix=$fwd" | Set-Content $_
-          }
+          Write-Host "FFmpeg extracted to $dir"
+          Get-ChildItem "$dir\lib" | Select-Object -First 8 Name
 
       - name: Configure & build streamview.exe
         shell: pwsh
         run: |
-          $env:PKG_CONFIG_PATH = Join-Path $env:FFMPEG_DIR "lib\pkgconfig"
-          cmake -B build -S . -DSTREAMVIEW_ENABLE_FFMPEG=ON
+          cmake -B build -S . -DSTREAMVIEW_ENABLE_FFMPEG=ON -DFFMPEG_ROOT="$env:FFMPEG_DIR"
           cmake --build build --config Release --target streamview
 
       - name: Fetch portable Node
@@ -54,7 +46,6 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory dist | Out-Null
-          # streamview.exe may land in Release\ or directly, depending on generator
           $exe = Get-ChildItem build -Recurse -Filter streamview.exe | Select-Object -First 1
           Copy-Item $exe.FullName dist\
           Copy-Item "$env:FFMPEG_DIR\bin\*.dll" dist\

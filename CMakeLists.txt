@@ -29,6 +29,23 @@ if(STREAMVIEW_ENABLE_FFMPEG)
         endif()
     endif()
 
+    # Fallback for platforms without pkg-config (e.g. Windows/MSVC): locate FFmpeg
+    # from a supplied FFMPEG_ROOT and build an equivalent PkgConfig::FFMPEG target.
+    if(NOT FFMPEG_FOUND AND DEFINED FFMPEG_ROOT)
+        find_path(FF_INC libavformat/avformat.h HINTS "${FFMPEG_ROOT}/include")
+        find_library(FF_AVFORMAT NAMES avformat HINTS "${FFMPEG_ROOT}/lib")
+        find_library(FF_AVCODEC NAMES avcodec HINTS "${FFMPEG_ROOT}/lib")
+        find_library(FF_AVUTIL NAMES avutil HINTS "${FFMPEG_ROOT}/lib")
+        if(FF_INC AND FF_AVFORMAT AND FF_AVCODEC AND FF_AVUTIL)
+            add_library(PkgConfig::FFMPEG INTERFACE IMPORTED)
+            set_target_properties(PkgConfig::FFMPEG PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${FF_INC}"
+                INTERFACE_LINK_LIBRARIES "${FF_AVFORMAT};${FF_AVCODEC};${FF_AVUTIL}")
+            set(FFMPEG_FOUND TRUE)
+            message(STATUS "FFmpeg found via FFMPEG_ROOT=${FFMPEG_ROOT}")
+        endif()
+    endif()
+
     if(FFMPEG_FOUND)
         add_subdirectory(libs/sv-demux)
         add_subdirectory(libs/sv-decode)
