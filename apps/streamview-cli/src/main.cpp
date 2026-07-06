@@ -7,6 +7,9 @@
 #if defined(STREAMVIEW_HAS_FFMPEG_DEMUX)
 #include "streamview/demux/ffmpeg_mp4_demuxer.hpp"
 #endif
+#if defined(STREAMVIEW_HAS_FFMPEG_DECODE)
+#include "streamview/decode/frame_decoder.hpp"
+#endif
 
 #ifndef STREAMVIEW_VERSION
 #define STREAMVIEW_VERSION "0.0.0"
@@ -111,6 +114,24 @@ struct ParseDumpArgsResult {
     std::string error;
 };
 
+struct DecodeOptions {
+    std::string input_path;
+    std::size_t frame_index{};
+    std::optional<std::string> thumbnail_path; // PPM output
+    int thumbnail_max_dim{320};
+    std::optional<std::string> mv_json_path;
+    std::optional<std::string> block_layer; // qp|partition|intra|motion (HEVC, libde265)
+    std::optional<std::string> block_out;   // PPM output for the block overlay
+    std::optional<std::size_t> frames_start; // batch range mode: first decode index
+    std::size_t frames_count{0};             //   number of frames to decode
+    std::optional<std::string> thumb_dir;    //   output dir for <decode_index>.ppm
+};
+
+struct ParseDecodeArgsResult {
+    std::optional<DecodeOptions> options;
+    std::string error;
+};
+
 void print_usage(std::ostream& out) {
     out << "Usage:\n"
         << "  streamview analyze <input> [--format text|json|csv] [--output <path|->] [--codec auto|h264|h265]\n"
@@ -119,6 +140,9 @@ void print_usage(std::ostream& out) {
         << "  streamview errors <input.h264> [--json]\n"
         << "  streamview validate <input.h264> [--json]\n"
         << "  streamview dump <input.h264> --nal <index> [--format hex|payload|rbsp] [--output <path|->]\n"
+        << "  streamview decode <input> --frame <index> [--thumb <out.ppm>] [--thumb-size <px>] [--mv-json <out.json>]\n"
+        << "  streamview decode <input> --frames <start>:<count> --thumb-dir <dir> [--thumb-size <px>]  (batch thumbnails)\n"
+        << "                    [--block-layer qp|partition|intra|motion --block-out <out.ppm>]  (HEVC, needs libde265)\n"
         << "  streamview --help\n";
 }
 
@@ -398,6 +422,14 @@ std::optional<CodecOverride> codec_from_extension(const std::string& path) {
     return std::nullopt;
 }
 
+// Containers demuxed to Annex B via FFmpeg (all use AVCC/HVCC extradata that the
+// mp4toannexb/hevc filters handle). Extension-gated; codec is detected inside.
+bool is_container_extension(const std::string& path) {
+    return has_extension(path, ".mp4") || has_extension(path, ".mov") ||
+           has_extension(path, ".m4v") || has_extension(path, ".mkv") ||
+           has_extension(path, ".webm");
+}
+
 std::optional<InputData> load_input_data(const std::string& path) {
     if (const auto codec = codec_from_extension(path); codec.has_value()) {
         const auto data = read_file(path);
@@ -407,11 +439,11 @@ std::optional<InputData> load_input_data(const std::string& path) {
         return InputData{.bytes = std::move(*data), .codec_hint = codec, .container = std::nullopt};
     }
 
-    if (has_extension(path, ".mp4")) {
+    if (is_container_extension(path)) {
 #if defined(STREAMVIEW_HAS_FFMPEG_DEMUX)
         const auto demux = streamview::demux::demux_mp4_to_annex_b(path);
         if (!demux.status.is_ok()) {
-            std::cerr << "streamview: failed to demux MP4: " << demux.status.message() << "\n";
+            std::cerr << "streamview: failed to demux container: " << demux.status.message() << "\n";
             return std::nullopt;
         }
         streamview::analysis::ContainerMetadata container{};
@@ -451,7 +483,7 @@ std::optional<InputData> load_input_data(const std::string& path) {
             .container = std::move(container),
         };
 #else
-        std::cerr << "streamview: MP4 input requires FFmpeg development libraries at build time\n";
+        std::cerr << "streamview: container input requires FFmpeg development libraries at build time\n";
         return std::nullopt;
 #endif
     }
@@ -1173,6 +1205,249 @@ int run_dump(const DumpOptions& options) {
     return write_dump_output(options, payload);
 }
 
+ParseDecodeArgsResult parse_decode_args(int argc, char** argv) {
+    if (argc < 3) {
+        return {.error = "decode requires an input path"};
+    }
+
+    DecodeOptions options{.input_path = argv[2]};
+    bool frame_set = false;
+    for (int i = 3; i < argc; ++i) {
+        const std::string_view arg = argv[i];
+        if (arg == "--frame") {
+            if (i + 1 >= argc) {
+                return {.error = "--frame requires a non-negative integer"};
+            }
+            const auto index = parse_size_arg(argv[++i]);
+            if (!index.has_value()) {
+                return {.error = "--frame requires a non-negative integer"};
+            }
+            options.frame_index = *index;
+            frame_set = true;
+        } else if (arg == "--frames") {
+            // Batch range: <start>:<count>
+            if (i + 1 >= argc) {
+                return {.error = "--frames requires <start>:<count>"};
+            }
+            const std::string spec = argv[++i];
+            const auto colon = spec.find(':');
+            if (colon == std::string::npos) {
+                return {.error = "--frames requires <start>:<count>"};
+            }
+            const auto start = parse_size_arg(spec.substr(0, colon));
+            const auto count = parse_size_arg(spec.substr(colon + 1));
+            if (!start.has_value() || !count.has_value()) {
+                return {.error = "--frames requires <start>:<count> non-negative integers"};
+            }
+            options.frames_start = *start;
+            options.frames_count = *count;
+            frame_set = true;
+        } else if (arg == "--thumb-dir") {
+            if (i + 1 >= argc) {
+                return {.error = "--thumb-dir requires a directory path"};
+            }
+            options.thumb_dir = argv[++i];
+        } else if (arg == "--thumb") {
+            if (i + 1 >= argc) {
+                return {.error = "--thumb requires an output path"};
+            }
+            options.thumbnail_path = argv[++i];
+        } else if (arg == "--thumb-size") {
+            if (i + 1 >= argc) {
+                return {.error = "--thumb-size requires a non-negative integer"};
+            }
+            const auto size = parse_size_arg(argv[++i]);
+            if (!size.has_value()) {
+                return {.error = "--thumb-size requires a non-negative integer"};
+            }
+            options.thumbnail_max_dim = static_cast<int>(*size);
+        } else if (arg == "--mv-json") {
+            if (i + 1 >= argc) {
+                return {.error = "--mv-json requires an output path"};
+            }
+            options.mv_json_path = argv[++i];
+        } else if (arg == "--block-layer") {
+            if (i + 1 >= argc) {
+                return {.error = "--block-layer requires qp, partition, intra, or motion"};
+            }
+            const std::string_view value = argv[++i];
+            if (value != "qp" && value != "partition" && value != "intra" && value != "motion") {
+                return {.error = "--block-layer must be qp, partition, intra, or motion"};
+            }
+            options.block_layer = std::string(value);
+        } else if (arg == "--block-out") {
+            if (i + 1 >= argc) {
+                return {.error = "--block-out requires an output path"};
+            }
+            options.block_out = argv[++i];
+        } else {
+            return {.error = "unknown decode option: " + std::string(arg)};
+        }
+    }
+
+    if (!frame_set) {
+        return {.error = "decode requires --frame <index>"};
+    }
+    return {.options = std::move(options)};
+}
+
+#if defined(STREAMVIEW_HAS_FFMPEG_DECODE)
+bool write_ppm(const std::string& path, const streamview::decode::RgbImage& image) {
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        return false;
+    }
+    out << "P6\n" << image.width << " " << image.height << "\n255\n";
+    out.write(reinterpret_cast<const char*>(image.rgb.data()),
+              static_cast<std::streamsize>(image.rgb.size()));
+    return static_cast<bool>(out);
+}
+
+bool write_mv_json(const std::string& path, const streamview::decode::DecodedFrame& frame) {
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        return false;
+    }
+    out << "{\n";
+    out << "  \"decode_index\": " << frame.decode_index << ",\n";
+    out << "  \"coded_width\": " << frame.coded_width << ",\n";
+    out << "  \"coded_height\": " << frame.coded_height << ",\n";
+    out << "  \"pict_type\": \"" << frame.pict_type << "\",\n";
+    out << "  \"keyframe\": " << (frame.keyframe ? "true" : "false") << ",\n";
+    out << "  \"motion_vector_count\": " << frame.motion_vectors.size() << ",\n";
+    out << "  \"motion_vectors\": [";
+    for (std::size_t i = 0; i < frame.motion_vectors.size(); ++i) {
+        const auto& mv = frame.motion_vectors[i];
+        out << (i == 0 ? "\n" : ",\n");
+        out << "    {\"source\": " << mv.source << ", \"w\": " << mv.w << ", \"h\": " << mv.h
+            << ", \"src_x\": " << mv.src_x << ", \"src_y\": " << mv.src_y
+            << ", \"dst_x\": " << mv.dst_x << ", \"dst_y\": " << mv.dst_y
+            << ", \"motion_x\": " << mv.motion_x << ", \"motion_y\": " << mv.motion_y
+            << ", \"motion_scale\": " << mv.motion_scale << "}";
+    }
+    out << (frame.motion_vectors.empty() ? "]\n" : "\n  ]\n");
+    out << "}\n";
+    return static_cast<bool>(out);
+}
+
+// Batch: decode a contiguous decode-order range in one pass, writing each
+// thumbnail as <thumb_dir>/<decode_index>.ppm and printing a JSON index.
+int run_decode_range(const DecodeOptions& options) {
+    streamview::decode::DecodeRangeOptions range_options{
+        .start_index = *options.frames_start,
+        .count = options.frames_count,
+        .thumbnail_max_dim = options.thumbnail_max_dim,
+    };
+    const auto result = streamview::decode::decode_frames(options.input_path, range_options);
+    if (!result.status.is_ok()) {
+        std::cerr << "streamview: decode failed: " << result.status.message() << "\n";
+        return 2;
+    }
+    std::cout << "{\n  \"frames\": [";
+    bool first = true;
+    for (const auto& frame : result.frames) {
+        const std::string ppm =
+            *options.thumb_dir + "/" + std::to_string(frame.decode_index) + ".ppm";
+        const bool wrote = frame.thumbnail.has_value() && write_ppm(ppm, *frame.thumbnail);
+        std::cout << (first ? "\n" : ",\n");
+        first = false;
+        std::cout << "    {\"decode_index\": " << frame.decode_index
+                  << ", \"coded_width\": " << frame.coded_width
+                  << ", \"coded_height\": " << frame.coded_height
+                  << ", \"pict_type\": \"" << frame.pict_type << "\""
+                  << ", \"keyframe\": " << (frame.keyframe ? "true" : "false")
+                  << ", \"thumb\": " << (wrote ? ("\"" + ppm + "\"") : "null") << "}";
+    }
+    std::cout << (result.frames.empty() ? "]\n}\n" : "\n  ]\n}\n");
+    return 0;
+}
+
+int run_decode(const DecodeOptions& options) {
+    if (options.frames_start.has_value() && options.thumb_dir.has_value()) {
+        return run_decode_range(options);
+    }
+    streamview::decode::DecodeOptions decode_options{
+        .frame_index = options.frame_index,
+        .want_thumbnail = options.thumbnail_path.has_value(),
+        .thumbnail_max_dim = options.thumbnail_max_dim,
+        .want_motion_vectors = true,
+    };
+    const auto result = streamview::decode::decode_frame(options.input_path, decode_options);
+    if (!result.status.is_ok() || !result.frame.has_value()) {
+        std::cerr << "streamview: decode failed: " << result.status.message() << "\n";
+        return 2;
+    }
+
+    const auto& frame = *result.frame;
+    std::cout << "decode_index: " << frame.decode_index << "\n"
+              << "resolution: " << frame.coded_width << "x" << frame.coded_height << "\n"
+              << "pict_type: " << frame.pict_type << "\n"
+              << "keyframe: " << (frame.keyframe ? "true" : "false") << "\n"
+              << "motion_vectors: " << frame.motion_vectors.size() << "\n";
+
+    if (options.thumbnail_path.has_value()) {
+        if (!frame.thumbnail.has_value()) {
+            std::cerr << "streamview: could not build a thumbnail for this frame\n";
+            return 2;
+        }
+        if (!write_ppm(*options.thumbnail_path, *frame.thumbnail)) {
+            std::cerr << "streamview: failed to write thumbnail: " << *options.thumbnail_path << "\n";
+            return 2;
+        }
+        std::cout << "thumbnail: " << *options.thumbnail_path << " ("
+                  << frame.thumbnail->width << "x" << frame.thumbnail->height << " ppm)\n";
+    }
+
+    if (options.mv_json_path.has_value()) {
+        if (!write_mv_json(*options.mv_json_path, frame)) {
+            std::cerr << "streamview: failed to write MV JSON: " << *options.mv_json_path << "\n";
+            return 2;
+        }
+        std::cout << "mv_json: " << *options.mv_json_path << "\n";
+    }
+
+    if (options.block_layer.has_value()) {
+        const auto input = load_input_data(options.input_path);
+        if (!input.has_value()) {
+            std::cerr << "streamview: failed to read input for block overlay\n";
+            return 2;
+        }
+        if (input->codec_hint != CodecOverride::H265) {
+            std::cerr << "streamview: block overlays currently support HEVC only\n";
+            return 2;
+        }
+        auto layer = streamview::decode::BlockLayer::Qp;
+        const auto& bl = *options.block_layer;
+        if (bl == "partition") {
+            layer = streamview::decode::BlockLayer::Partition;
+        } else if (bl == "intra") {
+            layer = streamview::decode::BlockLayer::IntraPred;
+        } else if (bl == "motion") {
+            layer = streamview::decode::BlockLayer::Motion;
+        }
+        const auto overlay = streamview::decode::render_hevc_block_overlay(
+            input->bytes, options.frame_index, layer, options.thumbnail_max_dim);
+        if (!overlay.status.is_ok() || !overlay.image.has_value()) {
+            std::cerr << "streamview: block overlay failed: " << overlay.status.message() << "\n";
+            return 2;
+        }
+        const std::string out = options.block_out.value_or("block.ppm");
+        if (!write_ppm(out, *overlay.image)) {
+            std::cerr << "streamview: failed to write block overlay: " << out << "\n";
+            return 2;
+        }
+        std::cout << "block(" << bl << "): " << out << " (" << overlay.image->width << "x"
+                  << overlay.image->height << " ppm)\n";
+    }
+    return 0;
+}
+#else
+int run_decode(const DecodeOptions&) {
+    std::cerr << "streamview: decode is unavailable (built without FFmpeg)\n";
+    return 2;
+}
+#endif
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -1230,6 +1505,15 @@ int main(int argc, char** argv) {
             return 1;
         }
         return run_dump(*result.options);
+    }
+    if (command == "decode") {
+        const auto result = parse_decode_args(argc, argv);
+        if (!result.options.has_value()) {
+            std::cerr << "streamview: " << result.error << "\n";
+            print_usage(std::cerr);
+            return 1;
+        }
+        return run_decode(*result.options);
     }
 
     std::cerr << "streamview: unknown command: " << command << "\n";

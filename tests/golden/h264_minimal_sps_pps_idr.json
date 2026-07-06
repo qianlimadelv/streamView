@@ -106,7 +106,18 @@
           "width": 640,
           "height": 360,
           "frame_mbs_only_flag": true,
-          "frame_cropping_flag": true
+          "frame_cropping_flag": true,
+          "vui": {
+            "aspect_ratio_idc": 1,
+            "video_full_range_flag": false,
+            "colour_primaries": 2,
+            "transfer_characteristics": 2,
+            "matrix_coefficients": 2,
+            "timing_info_present": true,
+            "num_units_in_tick": 1,
+            "time_scale": 50,
+            "fixed_frame_rate_flag": false
+          }
         }
       }
     },

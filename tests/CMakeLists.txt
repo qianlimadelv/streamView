@@ -528,6 +528,20 @@ if(STREAMVIEW_REAL_MEDIA_DIR)
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
             )
         endif()
+        # Decode smoke test needs the FFmpeg decode module (real, decodable input).
+        if(STREAMVIEW_HAS_FFMPEG_DEMUX)
+            add_test(
+                NAME streamview-cli-real-h264-decode
+                COMMAND
+                    ${CMAKE_COMMAND}
+                    -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+                    -DSTREAMVIEW_SAMPLE=${STREAMVIEW_REAL_H264_SAMPLE}
+                    -DSTREAMVIEW_THUMB=${CMAKE_CURRENT_BINARY_DIR}/real_h264_frame0.ppm
+                    -DSTREAMVIEW_MV_JSON=${CMAKE_CURRENT_BINARY_DIR}/real_h264_frame0_mv.json
+                    -DSTREAMVIEW_FRAME=0
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_decode_test.cmake
+            )
+        endif()
     endif()
 
     set(STREAMVIEW_REAL_H265_SAMPLE "${STREAMVIEW_REAL_MEDIA_DIR}/video_265_sd.h265")
@@ -557,6 +571,21 @@ if(STREAMVIEW_REAL_MEDIA_DIR)
                     -DSTREAMVIEW_JSON_MODE=summary
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
             )
+        endif()
+        # HEVC block-level overlay smoke tests (need libde265).
+        if(LIBDE265_FOUND)
+            foreach(layer qp partition intra)
+                add_test(
+                    NAME streamview-cli-real-h265-block-${layer}
+                    COMMAND
+                        ${CMAKE_COMMAND}
+                        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+                        -DSTREAMVIEW_SAMPLE=${STREAMVIEW_REAL_H265_SAMPLE}
+                        -DSTREAMVIEW_LAYER=${layer}
+                        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/real_h265_block_${layer}.ppm
+                        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_block_test.cmake
+                )
+            endforeach()
         endif()
     endif()
 endif()

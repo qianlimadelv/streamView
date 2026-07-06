@@ -15,6 +15,14 @@ if(TARGET StreamView::Demux)
     target_compile_definitions(streamview PRIVATE STREAMVIEW_HAS_FFMPEG_DEMUX=1)
 endif()
 
+if(TARGET StreamView::Decode)
+    target_link_libraries(streamview
+        PRIVATE
+            StreamView::Decode
+    )
+    target_compile_definitions(streamview PRIVATE STREAMVIEW_HAS_FFMPEG_DECODE=1)
+endif()
+
 target_compile_features(streamview PRIVATE cxx_std_20)
 target_compile_definitions(streamview PRIVATE STREAMVIEW_VERSION="${PROJECT_VERSION}")
 

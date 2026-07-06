@@ -11,6 +11,7 @@ add_library(sv-bitstream
     src/h265_sps.cpp
     src/h265_vps.cpp
     src/rbsp.cpp
+    src/sei.cpp
 )
 
 add_library(StreamView::Bitstream ALIAS sv-bitstream)

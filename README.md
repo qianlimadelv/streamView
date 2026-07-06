@@ -54,12 +54,23 @@ These media files are not part of the repository.
 
 Optional FFmpeg demux support requires FFmpeg development packages
 (`libavformat`, `libavcodec`, `libavutil`) discoverable through `pkg-config`.
-If they are missing, the raw H.264 Annex B analyzer still builds.
+If they are missing, the raw H.264 Annex B analyzer still builds. When present,
+container inputs (`.mp4`, `.mov`, `.m4v`, `.mkv`, `.webm`) are demuxed to Annex B
+and decoding (`decode` / the web UI) is enabled.
 
 Ubuntu/Debian:
 
 ```bash
 sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
+```
+
+Optional HEVC block-level overlays (per-block QP / CB partition / intra
+prediction / motion vectors, via `decode --block-layer` and the web UI's layer
+selector) require libde265. It is auto-detected through `pkg-config`; if missing,
+everything else still builds.
+
+```bash
+sudo apt install libde265-dev
 ```
 
 ## CLI
@@ -81,6 +92,8 @@ sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
 ./build/apps/streamview-cli/streamview validate samples/example.h264 --json
 ./build/apps/streamview-cli/streamview dump samples/example.h264 --nal 0 --format hex
 ./build/apps/streamview-cli/streamview dump samples/example.h264 --nal 0 --format payload --output nal0.bin
+./build/apps/streamview-cli/streamview decode samples/example.h264 --frame 3 --thumb f3.ppm --mv-json f3.json
+./build/apps/streamview-cli/streamview decode samples/example.h265 --frame 0 --block-layer qp --block-out qp.ppm
 ```
 
 Without `--json`, the CLI prints a concise text summary, including parse error
@@ -101,6 +114,26 @@ The newer output options are:
 
 `--json <path>` is kept as a compatibility alias for `--format json --output
 <path>`.
+
+Use `decode` (requires FFmpeg) to decode one frame to a PPM thumbnail and export
+its per-block motion vectors as JSON — the data source behind the web UI's
+motion-vector overlay.
+
+## Web UI
+
+A cross-platform browser UI (playback, frame-type/size timeline, per-frame
+detail with a decoded thumbnail and motion-vector overlay, a bitstream tree, a
+per-frame NAL syntax + hex panel, and — for HEVC with libde265 — a layer selector
+for QP / CB partition / intra-prediction / motion overlays) lives in
+`apps/streamview-web`. It has zero runtime dependencies and reuses the
+`streamview` CLI + `ffmpeg`:
+
+```bash
+cmake -S . -B build && cmake --build build   # build the CLI first
+cd apps/streamview-web && node server.js      # http://localhost:8787
+```
+
+See `apps/streamview-web/README.md` for details.
 
 Exit codes:
 

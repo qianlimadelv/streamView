@@ -8,6 +8,24 @@
 
 namespace streamview::bitstream {
 
+// H.265 VUI parameters (ITU-T H.265 E.2.1), parsed up to timing info.
+struct H265VuiInfo {
+    bool aspect_ratio_info_present_flag{};
+    std::uint8_t aspect_ratio_idc{};
+    std::uint16_t sar_width{};
+    std::uint16_t sar_height{};
+    bool video_signal_type_present_flag{};
+    std::uint8_t video_format{5};
+    bool video_full_range_flag{};
+    bool colour_description_present_flag{};
+    std::uint8_t colour_primaries{2};
+    std::uint8_t transfer_characteristics{2};
+    std::uint8_t matrix_coefficients{2};
+    bool vui_timing_info_present_flag{};
+    std::uint32_t vui_num_units_in_tick{};
+    std::uint32_t vui_time_scale{};
+};
+
 struct H265SpsInfo {
     std::uint8_t profile_idc{};
     bool tier_flag{};
@@ -27,6 +45,7 @@ struct H265SpsInfo {
     std::uint32_t conf_win_right_offset{};
     std::uint32_t conf_win_top_offset{};
     std::uint32_t conf_win_bottom_offset{};
+    std::optional<H265VuiInfo> vui;
 };
 
 struct H265SpsParseResult {

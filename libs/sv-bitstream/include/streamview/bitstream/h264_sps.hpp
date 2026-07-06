@@ -8,6 +8,27 @@
 
 namespace streamview::bitstream {
 
+// VUI parameters (ITU-T H.264 E.1.1) — the fields StreamEye-class tools surface.
+struct H264VuiInfo {
+    bool aspect_ratio_info_present_flag{};
+    std::uint8_t aspect_ratio_idc{};
+    std::uint16_t sar_width{};
+    std::uint16_t sar_height{};
+    bool video_signal_type_present_flag{};
+    std::uint8_t video_format{5};
+    bool video_full_range_flag{};
+    bool colour_description_present_flag{};
+    std::uint8_t colour_primaries{2};
+    std::uint8_t transfer_characteristics{2};
+    std::uint8_t matrix_coefficients{2};
+    bool timing_info_present_flag{};
+    std::uint32_t num_units_in_tick{};
+    std::uint32_t time_scale{};
+    bool fixed_frame_rate_flag{};
+    bool nal_hrd_parameters_present_flag{};
+    bool vcl_hrd_parameters_present_flag{};
+};
+
 struct H264SpsInfo {
     std::uint8_t profile_idc{};
     std::uint8_t constraint_flags{};
@@ -30,6 +51,7 @@ struct H264SpsInfo {
     std::uint32_t frame_crop_bottom_offset{};
     std::uint32_t width{};
     std::uint32_t height{};
+    std::optional<H264VuiInfo> vui;
 };
 
 struct H264SpsParseResult {
