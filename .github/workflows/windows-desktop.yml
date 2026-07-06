@@ -1,0 +1,70 @@
+name: Windows desktop (.msi)
+
+# Builds the Tauri desktop app (.msi/.exe) bundling streamview.exe, ffmpeg,
+# a portable Node and the web front-end. Double-click installer, drag-drop works.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ feat/sv-decode-web-gui ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch FFmpeg (BtbN shared build)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip"
+          curl.exe -L -o ffmpeg.zip $url
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
+          $dir = (Get-ChildItem ffmpeg -Directory | Select-Object -First 1).FullName
+          "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build streamview.exe
+        shell: pwsh
+        run: |
+          cmake -B build -S . -DSTREAMVIEW_ENABLE_FFMPEG=ON -DFFMPEG_ROOT="$env:FFMPEG_DIR"
+          cmake --build build --config Release --target streamview
+
+      - name: Fetch portable Node
+        shell: pwsh
+        run: |
+          $url = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-win-x64.zip"
+          curl.exe -L -o node.zip $url
+          Expand-Archive node.zip -DestinationPath nodedist
+          $nodeexe = (Get-ChildItem nodedist -Recurse -Filter node.exe | Select-Object -First 1).FullName
+          "NODE_EXE=$nodeexe" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Stage Tauri resources
+        shell: pwsh
+        run: |
+          $r = "apps/streamview-desktop/src-tauri/resources"
+          New-Item -ItemType Directory -Force $r | Out-Null
+          $exe = Get-ChildItem build -Recurse -Filter streamview.exe | Select-Object -First 1
+          Copy-Item $exe.FullName "$r\"
+          Copy-Item "$env:FFMPEG_DIR\bin\*.dll" "$r\"
+          Copy-Item "$env:FFMPEG_DIR\bin\ffmpeg.exe" "$r\"
+          Copy-Item $env:NODE_EXE "$r\"
+          New-Item -ItemType Directory -Force "$r\streamview-web" | Out-Null
+          Copy-Item apps\streamview-web\server.js "$r\streamview-web\"
+          Copy-Item -Recurse apps\streamview-web\public "$r\streamview-web\public"
+          Write-Host "Resources staged:"; Get-ChildItem $r
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@^2
+
+      - name: Tauri build
+        working-directory: apps/streamview-desktop
+        run: tauri build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: streamview-desktop-msi
+          path: |
+            apps/streamview-desktop/src-tauri/target/release/bundle/msi/*.msi
+            apps/streamview-desktop/src-tauri/target/release/bundle/nsis/*.exe
