@@ -1,0 +1,78 @@
+name: Windows build (web-mode tool)
+
+# Builds streamview.exe on a Windows runner and bundles it with ffmpeg, a
+# portable Node, the web front-end and a run.bat launcher into a zip artifact.
+# No Windows toolchain needed on your machine — download the artifact, unzip,
+# double-click run.bat.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ feat/sv-decode-web-gui ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pkg-config
+        run: choco install pkgconfiglite -y --no-progress
+
+      - name: Fetch FFmpeg (shared dev build)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/GyanD/codexffmpeg/releases/download/7.1/ffmpeg-7.1-full_build-shared.7z"
+          curl.exe -L -o ffmpeg.7z $url
+          7z x ffmpeg.7z -offmpeg | Out-Null
+          $dir = (Get-ChildItem ffmpeg -Directory | Select-Object -First 1).FullName
+          "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # gyan .pc files carry a build-time prefix; repoint them at the extracted dir
+          $pcp = Join-Path $dir "lib\pkgconfig"
+          $fwd = $dir -replace '\\','/'
+          Get-ChildItem "$pcp\*.pc" | ForEach-Object {
+            (Get-Content $_) -replace '^prefix=.*', "prefix=$fwd" | Set-Content $_
+          }
+
+      - name: Configure & build streamview.exe
+        shell: pwsh
+        run: |
+          $env:PKG_CONFIG_PATH = Join-Path $env:FFMPEG_DIR "lib\pkgconfig"
+          cmake -B build -S . -DSTREAMVIEW_ENABLE_FFMPEG=ON
+          cmake --build build --config Release --target streamview
+
+      - name: Fetch portable Node
+        shell: pwsh
+        run: |
+          $url = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-win-x64.zip"
+          curl.exe -L -o node.zip $url
+          Expand-Archive node.zip -DestinationPath nodedist
+          $nodeexe = (Get-ChildItem nodedist -Recurse -Filter node.exe | Select-Object -First 1).FullName
+          "NODE_EXE=$nodeexe" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Stage distributable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          # streamview.exe may land in Release\ or directly, depending on generator
+          $exe = Get-ChildItem build -Recurse -Filter streamview.exe | Select-Object -First 1
+          Copy-Item $exe.FullName dist\
+          Copy-Item "$env:FFMPEG_DIR\bin\*.dll" dist\
+          Copy-Item "$env:FFMPEG_DIR\bin\ffmpeg.exe" dist\
+          Copy-Item $env:NODE_EXE dist\
+          Copy-Item -Recurse apps\streamview-web dist\streamview-web
+          $bat = @"
+          @echo off
+          cd /d %~dp0
+          set STREAMVIEW_BIN=%~dp0streamview.exe
+          set FFMPEG_BIN=%~dp0ffmpeg.exe
+          set PORT=8787
+          start "" http://localhost:8787
+          "%~dp0node.exe" "%~dp0streamview-web\server.js"
+          "@
+          Set-Content -Path dist\run.bat -Value $bat -Encoding ascii
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: streamview-windows
+          path: dist
