@@ -45,21 +45,33 @@ function run(bin, args, opts = {}) {
 // GET /api/browse?dir=<path> -> subdirectories + media files, for the file picker.
 // (Browsers can't hand a server a local absolute path, so we browse server-side.)
 function handleBrowse(res, query) {
-  const dir = query.get('dir') || os.homedir();
-  let resolved = dir;
+  const dir = query.get('dir');
+  // Windows: virtual top level that lists every available drive letter.
+  if (dir === '__drives__') {
+    const dirs = [];
+    for (let c = 67; c <= 90; c++) { // C..Z
+      const root = String.fromCharCode(c) + ':\\';
+      try { fs.accessSync(root); dirs.push(root); } catch (e) { /* no such drive */ }
+    }
+    return sendJson(res, 200, { dir: '', parent: null, dirs, files: [] });
+  }
+  let resolved = dir || os.homedir();
   try {
-    resolved = path.resolve(dir);
+    resolved = path.resolve(resolved);
     const entries = fs.readdirSync(resolved, { withFileTypes: true });
     const dirs = [];
     const files = [];
     for (const e of entries) {
       if (e.name.startsWith('.')) continue;
-      if (e.isDirectory()) dirs.push(e.name);
-      else if (/\.(h264|264|h265|265|hevc|mp4|mov|m4v|mkv|webm|ts)$/i.test(e.name)) files.push(e.name);
+      // Return full paths so the client never has to join across OS separators.
+      if (e.isDirectory()) dirs.push(path.join(resolved, e.name));
+      else if (/\.(h264|264|h265|265|hevc|mp4|mov|m4v|mkv|webm|ts)$/i.test(e.name)) files.push(path.join(resolved, e.name));
     }
     dirs.sort((a, b) => a.localeCompare(b));
     files.sort((a, b) => a.localeCompare(b));
-    sendJson(res, 200, { dir: resolved, parent: path.dirname(resolved), dirs, files });
+    let parent = path.dirname(resolved);
+    if (parent === resolved) parent = process.platform === 'win32' ? '__drives__' : null;
+    sendJson(res, 200, { dir: resolved, parent, dirs, files });
   } catch (e) {
     sendJson(res, 400, { error: String(e.message), dir: resolved });
   }
@@ -132,14 +144,17 @@ async function handleFrames(res, query) {
       '--thumb-dir', dir, '--thumb-size', String(size),
     ]);
     const parsed = JSON.parse(stdout);
-    const frames = (parsed.frames || []).map(f => ({
-      decode_index: f.decode_index,
-      coded_width: f.coded_width,
-      coded_height: f.coded_height,
-      pict_type: f.pict_type,
-      keyframe: f.keyframe,
-      thumb_ppm_base64: f.thumb && fs.existsSync(f.thumb) ? fs.readFileSync(f.thumb).toString('base64') : null,
-    }));
+    const frames = (parsed.frames || []).map(f => {
+      const ppm = path.join(dir, f.decode_index + '.ppm');
+      return {
+        decode_index: f.decode_index,
+        coded_width: f.coded_width,
+        coded_height: f.coded_height,
+        pict_type: f.pict_type,
+        keyframe: f.keyframe,
+        thumb_ppm_base64: fs.existsSync(ppm) ? fs.readFileSync(ppm).toString('base64') : null,
+      };
+    });
     sendJson(res, 200, { frames });
   } catch (e) {
     sendJson(res, 500, { error: 'batch decode failed', detail: String(e.stderr || e.message) });

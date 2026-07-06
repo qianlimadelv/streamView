@@ -1346,17 +1346,20 @@ int run_decode_range(const DecodeOptions& options) {
     std::cout << "{\n  \"frames\": [";
     bool first = true;
     for (const auto& frame : result.frames) {
-        const std::string ppm =
-            *options.thumb_dir + "/" + std::to_string(frame.decode_index) + ".ppm";
-        const bool wrote = frame.thumbnail.has_value() && write_ppm(ppm, *frame.thumbnail);
+        // Write <thumb_dir>/<decode_index>.ppm; the server reconstructs this path
+        // itself (we don't emit it in JSON to avoid unescaped Windows backslashes).
+        if (frame.thumbnail.has_value()) {
+            const std::string ppm =
+                *options.thumb_dir + "/" + std::to_string(frame.decode_index) + ".ppm";
+            write_ppm(ppm, *frame.thumbnail);
+        }
         std::cout << (first ? "\n" : ",\n");
         first = false;
         std::cout << "    {\"decode_index\": " << frame.decode_index
                   << ", \"coded_width\": " << frame.coded_width
                   << ", \"coded_height\": " << frame.coded_height
                   << ", \"pict_type\": \"" << frame.pict_type << "\""
-                  << ", \"keyframe\": " << (frame.keyframe ? "true" : "false")
-                  << ", \"thumb\": " << (wrote ? ("\"" + ppm + "\"") : "null") << "}";
+                  << ", \"keyframe\": " << (frame.keyframe ? "true" : "false") << "}";
     }
     std::cout << (result.frames.empty() ? "]\n}\n" : "\n  ]\n}\n");
     return 0;

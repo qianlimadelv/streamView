@@ -102,15 +102,16 @@ async function loadDir(dir) {
     if (d.error) { setStatus('浏览失败: ' + d.error); }
     if (d.dir) state.browseDir = d.dir;
     el('browserPath').textContent = d.dir || dir || '';
+    const base = p => p.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || p;
     const rows = [];
     if (d.parent && d.parent !== d.dir) {
       rows.push(`<div class="browser-item dir" data-dir="${d.parent}"><span class="ic">⬆</span>..</div>`);
     }
-    for (const name of (d.dirs || [])) {
-      rows.push(`<div class="browser-item dir" data-dir="${d.dir}/${name}"><span class="ic">📁</span>${name}</div>`);
+    for (const full of (d.dirs || [])) {
+      rows.push(`<div class="browser-item dir" data-dir="${full}"><span class="ic">📁</span>${base(full)}</div>`);
     }
-    for (const name of (d.files || [])) {
-      rows.push(`<div class="browser-item file" data-file="${d.dir}/${name}"><span class="ic">🎬</span>${name}</div>`);
+    for (const full of (d.files || [])) {
+      rows.push(`<div class="browser-item file" data-file="${full}"><span class="ic">🎬</span>${base(full)}</div>`);
     }
     el('browserList').innerHTML = rows.join('') || '<div class="browser-item">（此目录无子目录或视频文件）</div>';
   } catch (e) {
