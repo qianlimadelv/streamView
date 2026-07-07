@@ -1,12 +1,23 @@
 use std::process::Command;
-use tauri::Manager;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            // Start the backend and wait for it to accept connections, then
+            // create the window pointing at it — so the first load succeeds
+            // instead of showing a blank/error page while the server boots.
             start_backend(app);
+            WebviewWindowBuilder::new(
+                app,
+                "main",
+                WebviewUrl::External("http://localhost:8799".parse().unwrap()),
+            )
+            .title("StreamView")
+            .inner_size(1400.0, 900.0)
+            .build()?;
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -37,6 +48,12 @@ fn start_backend(app: &tauri::App) {
         eprintln!("streamview: dev backend (system node)");
     }
     cmd.env("PORT", "8799");
+    // Hide the child's console window on Windows (CREATE_NO_WINDOW).
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
     match cmd.spawn() {
         Ok(_) => eprintln!("streamview: backend started"),
         Err(e) => eprintln!("streamview: failed to start backend: {e}"),

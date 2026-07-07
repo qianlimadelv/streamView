@@ -8,14 +8,7 @@
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [
-      {
-        "title": "StreamView",
-        "width": 1400,
-        "height": 900,
-        "url": "http://localhost:8799"
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }
