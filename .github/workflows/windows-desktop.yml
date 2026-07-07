@@ -60,11 +60,20 @@ jobs:
 
       - name: Tauri build
         working-directory: apps/streamview-desktop
-        run: tauri build
+        run: tauri build --verbose
+
+      - name: Locate installers
+        shell: pwsh
+        run: |
+          Write-Host "=== .msi / .exe under target ==="
+          Get-ChildItem -Recurse apps/streamview-desktop/src-tauri/target -Include *.msi,*.exe -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+          Write-Host "=== bundle dirs ==="
+          Get-ChildItem -Recurse -Directory apps/streamview-desktop/src-tauri/target -Filter bundle -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
 
       - uses: actions/upload-artifact@v4
         with:
           name: streamview-desktop-msi
+          if-no-files-found: error
           path: |
-            apps/streamview-desktop/src-tauri/target/release/bundle/msi/*.msi
-            apps/streamview-desktop/src-tauri/target/release/bundle/nsis/*.exe
+            apps/streamview-desktop/src-tauri/target/**/bundle/**/*.msi
+            apps/streamview-desktop/src-tauri/target/**/bundle/**/*.exe
