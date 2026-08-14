@@ -24,6 +24,7 @@ jobs:
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
           $dir = (Get-ChildItem ffmpeg -Directory | Select-Object -First 1).FullName
           "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$dir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
           Write-Host "FFmpeg extracted to $dir"
           Get-ChildItem "$dir\lib" | Select-Object -First 8 Name
 

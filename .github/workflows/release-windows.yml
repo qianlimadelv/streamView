@@ -29,6 +29,7 @@ jobs:
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
           $dir = (Get-ChildItem ffmpeg -Directory | Select-Object -First 1).FullName
           "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$dir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
           if (-not (Test-Path "$dir\bin\ffmpeg.exe")) { throw "FFmpeg executable was not found" }
 
       - name: Configure, build, and test C++ core
