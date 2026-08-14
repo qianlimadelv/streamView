@@ -27,6 +27,8 @@ struct H264VuiInfo {
     bool fixed_frame_rate_flag{};
     bool nal_hrd_parameters_present_flag{};
     bool vcl_hrd_parameters_present_flag{};
+
+    bool operator==(const H264VuiInfo&) const = default;
 };
 
 struct H264SpsInfo {
@@ -52,6 +54,8 @@ struct H264SpsInfo {
     std::uint32_t width{};
     std::uint32_t height{};
     std::optional<H264VuiInfo> vui;
+
+    bool operator==(const H264SpsInfo&) const = default;
 };
 
 struct H264SpsParseResult {

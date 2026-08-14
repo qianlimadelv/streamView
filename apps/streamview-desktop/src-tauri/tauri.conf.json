@@ -15,6 +15,9 @@
   },
   "bundle": {
     "active": true,
+    "category": "DeveloperTool",
+    "shortDescription": "H.264/H.265 bitstream analyzer",
+    "longDescription": "StreamView Lite analyzes H.264 and H.265 video bitstreams with a timeline, frame details, syntax tree, thumbnails, and motion vectors.",
     "targets": "all",
     "resources": [
       "resources/**/*"

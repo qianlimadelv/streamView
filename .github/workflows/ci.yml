@@ -43,3 +43,31 @@ jobs:
 
       - name: Test
         run: ${{ matrix.test }}
+
+  web-check:
+    name: Web syntax check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check JavaScript syntax
+        run: |
+          node --check apps/streamview-web/server.js
+          node --check apps/streamview-web/public/app.js
+
+  core-no-optional-deps:
+    name: Core without optional FFmpeg modules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSTREAMVIEW_ENABLE_FFMPEG=OFF
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure

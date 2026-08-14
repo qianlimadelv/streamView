@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -315,44 +316,53 @@ void test_analyzes_h265_frame_poc_from_context() {
     require(analysis.frames[0].poc.value() == 5, "H.265 POC frame poc");
 }
 
-void test_validates_duplicate_h264_parameter_sets() {
+void test_allows_repeated_identical_h264_parameter_sets() {
     auto stream = make_minimal_h264_stream();
     const auto duplicate = stream;
     stream.insert(stream.end(), duplicate.begin(), duplicate.end());
 
-    const auto analysis = streamview::analysis::analyze_h264_annex_b("dup.h264", stream);
+    auto analysis = streamview::analysis::analyze_h264_annex_b("dup.h264", stream);
     const auto issues = streamview::analysis::validate_stream_analysis(analysis);
 
-    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
-                return issue.code == "duplicate_h264_sps_id" && issue.severity == "warning";
+    require(std::none_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "redefined_h264_sps_id" || issue.code == "redefined_h264_pps_id";
             }),
-            "H.264 duplicate SPS validation issue");
-    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
-                return issue.code == "duplicate_h264_pps_id" && issue.severity == "warning";
+            "identical H.264 parameter sets should not be reported as redefinitions");
+
+    auto changed_sps = analysis.nals.front();
+    changed_sps.index = analysis.nals.size();
+    changed_sps.h264->sps->width += 16;
+    analysis.nals.push_back(std::move(changed_sps));
+    const auto changed_issues = streamview::analysis::validate_stream_analysis(analysis);
+    require(std::any_of(changed_issues.begin(), changed_issues.end(), [](const auto& issue) {
+                return issue.code == "redefined_h264_sps_id" && issue.severity == "warning";
             }),
-            "H.264 duplicate PPS validation issue");
+            "changed H.264 parameter sets should be reported as redefinitions");
 }
 
-void test_validates_duplicate_h265_parameter_sets() {
+void test_allows_repeated_identical_h265_parameter_sets() {
     auto stream = make_minimal_h265_stream();
     const auto duplicate = stream;
     stream.insert(stream.end(), duplicate.begin(), duplicate.end());
 
-    const auto analysis = streamview::analysis::analyze_h265_annex_b("dup.h265", stream);
+    auto analysis = streamview::analysis::analyze_h265_annex_b("dup.h265", stream);
     const auto issues = streamview::analysis::validate_stream_analysis(analysis);
 
-    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
-                return issue.code == "duplicate_h265_vps_id" && issue.severity == "warning";
+    require(std::none_of(issues.begin(), issues.end(), [](const auto& issue) {
+                return issue.code == "redefined_h265_vps_id" || issue.code == "redefined_h265_sps_id" ||
+                       issue.code == "redefined_h265_pps_id";
             }),
-            "H.265 duplicate VPS validation issue");
-    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
-                return issue.code == "duplicate_h265_sps_id" && issue.severity == "warning";
+            "identical H.265 parameter sets should not be reported as redefinitions");
+
+    auto changed_vps = analysis.nals.front();
+    changed_vps.index = analysis.nals.size();
+    changed_vps.h265->vps->level_idc += 1;
+    analysis.nals.push_back(std::move(changed_vps));
+    const auto changed_issues = streamview::analysis::validate_stream_analysis(analysis);
+    require(std::any_of(changed_issues.begin(), changed_issues.end(), [](const auto& issue) {
+                return issue.code == "redefined_h265_vps_id" && issue.severity == "warning";
             }),
-            "H.265 duplicate SPS validation issue");
-    require(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
-                return issue.code == "duplicate_h265_pps_id" && issue.severity == "warning";
-            }),
-            "H.265 duplicate PPS validation issue");
+            "changed H.265 parameter sets should be reported as redefinitions");
 }
 
 void test_validates_frame_gop_consistency() {
@@ -647,8 +657,8 @@ int main() {
     test_analyzes_h264_frame_poc_from_context();
     test_analyzes_minimal_h265_stream();
     test_analyzes_h265_frame_poc_from_context();
-    test_validates_duplicate_h264_parameter_sets();
-    test_validates_duplicate_h265_parameter_sets();
+    test_allows_repeated_identical_h264_parameter_sets();
+    test_allows_repeated_identical_h265_parameter_sets();
     test_validates_frame_gop_consistency();
     test_validates_resolution_change_detection();
     test_validates_h265_resolution_change_detection();

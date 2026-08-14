@@ -23,7 +23,7 @@ with `ffmpeg`. No parsing/decoding logic lives in this app.
 
 ```bash
 cd apps/streamview-web
-node server.js            # http://localhost:8787
+node server.js            # http://127.0.0.1:8787
 ```
 
 Then open the URL, paste an absolute path to a `.h264` / `.h265` / `.mp4` file,
@@ -33,9 +33,13 @@ and click **Analyze**. You can also deep-link:
 Environment overrides:
 
 - `PORT` — listen port (default `8787`).
+- `HOST` — listen address (default `127.0.0.1`; the backend is intentionally
+  local-only because its API reads local media paths).
 - `STREAMVIEW_BIN` — path to the `streamview` binary (default
   `../../build/apps/streamview-cli/streamview`).
 - `FFMPEG_BIN` — ffmpeg binary (default `ffmpeg`).
+- `STREAMVIEW_HEVC_BLOCKS=1` — advertise HEVC block overlays when the CLI was
+  built with optional libde265 support.
 
 ## HTTP API
 
@@ -49,6 +53,10 @@ Environment overrides:
 - `GET /api/video?path=<file>` — playable MP4 (stream-copied or re-encoded),
   with HTTP range support for seeking.
 - `GET /api/health` — sanity check.
+
+The backend caches a few recent analysis results by file size and modification
+time. API responses are marked non-cacheable so a changed input is analyzed
+again.
 
 ## Scope
 

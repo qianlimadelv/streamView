@@ -6,7 +6,7 @@ name: Windows desktop (.msi)
 on:
   workflow_dispatch:
   push:
-    branches: [ feat/sv-decode-web-gui ]
+    branches: [ main, feat/sv-decode-web-gui ]
 
 jobs:
   build:
@@ -27,7 +27,8 @@ jobs:
         shell: pwsh
         run: |
           cmake -B build -S . -DSTREAMVIEW_ENABLE_FFMPEG=ON -DFFMPEG_ROOT="$env:FFMPEG_DIR"
-          cmake --build build --config Release --target streamview
+          cmake --build build --config Release --parallel
+          ctest --test-dir build -C Release --output-on-failure
 
       - name: Fetch portable Node
         shell: pwsh
@@ -55,12 +56,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli@^2
+      - name: Install Tauri dependencies
+        working-directory: apps/streamview-desktop
+        run: npm ci
 
       - name: Tauri build
         working-directory: apps/streamview-desktop
-        run: tauri build --verbose
+        run: npx tauri build --ci --verbose
 
       - name: Locate installers
         shell: pwsh

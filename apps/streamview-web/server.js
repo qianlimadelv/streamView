@@ -7,7 +7,7 @@
 // preserving the "core independent of the UI" architecture rule.
 
 const http = require('http');
-const { execFile, spawn } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -16,6 +16,9 @@ const crypto = require('crypto');
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8787;
+// The backend can read arbitrary local paths by design, so never expose it on
+// the LAN. Tauri and the browser UI both use localhost.
+const HOST = process.env.HOST || '127.0.0.1';
 
 // Locate the streamview CLI: env override, then the conventional build/ path.
 const STREAMVIEW_BIN =
@@ -23,10 +26,28 @@ const STREAMVIEW_BIN =
   path.resolve(ROOT, '../../build/apps/streamview-cli/streamview');
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
 const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'streamview-web-'));
+const analysisCache = new Map();
+const HEVC_BLOCK_OVERLAYS = process.env.STREAMVIEW_HEVC_BLOCKS === '1';
+
+function fileKey(input) {
+  const resolved = path.resolve(input);
+  const stat = fs.statSync(resolved);
+  return `${resolved}:${stat.size}:${stat.mtimeMs}`;
+}
+
+function remember(cache, key, value, maxEntries = 3) {
+  cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > maxEntries) cache.delete(cache.keys().next().value);
+}
 
 function sendJson(res, code, obj) {
   const body = Buffer.from(JSON.stringify(obj));
-  res.writeHead(code, { 'Content-Type': 'application/json', 'Content-Length': body.length });
+  res.writeHead(code, {
+    'Content-Type': 'application/json',
+    'Content-Length': body.length,
+    'Cache-Control': 'no-store',
+  });
   res.end(body);
 }
 
@@ -83,11 +104,16 @@ async function handleAnalyze(res, query) {
   if (!input) return sendJson(res, 400, { error: 'missing path' });
   if (!fs.existsSync(input)) return sendJson(res, 404, { error: 'file not found: ' + input });
   try {
-    const { stdout } = await run(STREAMVIEW_BIN, [
-      'analyze', input, '--format', 'json', '--output', '-',
-    ]);
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(stdout);
+    const key = fileKey(input);
+    let analysis = analysisCache.get(key);
+    if (!analysis) {
+      const { stdout } = await run(STREAMVIEW_BIN, [
+        'analyze', input, '--format', 'json', '--output', '-',
+      ]);
+      analysis = JSON.parse(stdout);
+      remember(analysisCache, key, analysis);
+    }
+    sendJson(res, 200, analysis);
   } catch (e) {
     sendJson(res, 500, { error: 'analyze failed', detail: String(e.stderr || e.message) });
   }
@@ -250,13 +276,15 @@ function handleHex(res, query) {
   }
   const readLen = Math.max(0, Math.min(size, limit));
   const buf = Buffer.alloc(readLen);
+  let fd;
   try {
-    const fd = fs.openSync(input, 'r');
+    fd = fs.openSync(input, 'r');
     const n = fs.readSync(fd, buf, 0, readLen, offset);
-    fs.closeSync(fd);
     sendJson(res, 200, { hex: hexdump(buf.subarray(0, n)), total: size, shown: n, truncated: n < size });
   } catch (e) {
     sendJson(res, 500, { error: 'read failed', detail: String(e.message) });
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
   }
 }
 
@@ -306,8 +334,16 @@ function serveFileWithRange(req, res, filePath, contentType) {
   const range = req.headers.range;
   if (range) {
     const m = /bytes=(\d*)-(\d*)/.exec(range);
-    const start = m[1] ? parseInt(m[1], 10) : 0;
-    const end = m[2] ? parseInt(m[2], 10) : stat.size - 1;
+    if (!m) {
+      res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` });
+      return res.end();
+    }
+    const start = m[1] ? parseInt(m[1], 10) : Math.max(0, stat.size - parseInt(m[2], 10));
+    const end = m[2] ? Math.min(stat.size - 1, parseInt(m[2], 10)) : stat.size - 1;
+    if (start < 0 || start >= stat.size || end < start) {
+      res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` });
+      return res.end();
+    }
     res.writeHead(206, {
       'Content-Range': `bytes ${start}-${end}/${stat.size}`,
       'Accept-Ranges': 'bytes',
@@ -344,8 +380,8 @@ const STATIC_TYPES = {
 
 function serveStatic(res, urlPath) {
   const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
-  const filePath = path.join(PUBLIC_DIR, rel);
-  if (!filePath.startsWith(PUBLIC_DIR) || !fs.existsSync(filePath)) {
+  const filePath = path.resolve(PUBLIC_DIR, rel);
+  if ((filePath !== PUBLIC_DIR && !filePath.startsWith(PUBLIC_DIR + path.sep)) || !fs.existsSync(filePath)) {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     return res.end('not found');
   }
@@ -366,11 +402,27 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/validate') return handleValidate(res, q);
   if (url.pathname === '/api/hex') return handleHex(res, q);
   if (url.pathname === '/api/video') return handleVideo(req, res, q);
-  if (url.pathname === '/api/health') return sendJson(res, 200, { ok: true, bin: STREAMVIEW_BIN });
+  if (url.pathname === '/api/health') {
+    return sendJson(res, 200, {
+      ok: true,
+      bin: STREAMVIEW_BIN,
+      ffmpeg: FFMPEG_BIN,
+      hevc_block_overlays: HEVC_BLOCK_OVERLAYS,
+    });
+  }
   return serveStatic(res, url.pathname);
 });
 
-server.listen(PORT, () => {
-  console.log(`StreamView Web on http://localhost:${PORT}`);
+function cleanup() {
+  fs.rmSync(TMP_DIR, { recursive: true, force: true });
+}
+process.once('exit', cleanup);
+process.once('SIGINT', () => { cleanup(); process.exit(0); });
+process.once('SIGTERM', () => { cleanup(); process.exit(0); });
+
+server.listen(PORT, HOST, () => {
+  console.log(`StreamView Web on http://${HOST}:${PORT}`);
   console.log(`  streamview: ${STREAMVIEW_BIN}${fs.existsSync(STREAMVIEW_BIN) ? '' : '  (NOT FOUND — build it or set STREAMVIEW_BIN)'}`);
+  console.log(`  ffmpeg: ${FFMPEG_BIN}`);
+  console.log(`  HEVC block overlays: ${HEVC_BLOCK_OVERLAYS ? 'enabled' : 'disabled'}`);
 });

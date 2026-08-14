@@ -14,6 +14,8 @@ struct H265PpsInfo {
     bool dependent_slice_segments_enabled_flag{};
     bool output_flag_present_flag{};
     std::uint8_t num_extra_slice_header_bits{};
+
+    bool operator==(const H265PpsInfo&) const = default;
 };
 
 struct H265PpsParseResult {

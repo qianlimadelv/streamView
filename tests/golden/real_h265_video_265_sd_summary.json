@@ -1,7 +1,7 @@
 {
   "format": "annex_b",
   "codec_guess": "h265",
-  "input": "/home/zhangyp/code/media/video_265_sd.h265",
+  "input": "video_265_sd.h265",
   "size_bytes": 21090718,
   "nal_count": 2712,
   "stream_summary": {

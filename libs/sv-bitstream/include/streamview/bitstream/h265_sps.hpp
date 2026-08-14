@@ -24,6 +24,8 @@ struct H265VuiInfo {
     bool vui_timing_info_present_flag{};
     std::uint32_t vui_num_units_in_tick{};
     std::uint32_t vui_time_scale{};
+
+    bool operator==(const H265VuiInfo&) const = default;
 };
 
 struct H265SpsInfo {
@@ -46,6 +48,8 @@ struct H265SpsInfo {
     std::uint32_t conf_win_top_offset{};
     std::uint32_t conf_win_bottom_offset{};
     std::optional<H265VuiInfo> vui;
+
+    bool operator==(const H265SpsInfo&) const = default;
 };
 
 struct H265SpsParseResult {

@@ -1,143 +1,121 @@
-# StreamView
+# StreamView Lite
 
-StreamView is a cross-platform compressed video bitstream analysis prototype.
+StreamView 是一个面向 H.264/H.265 视频码流的桌面分析工具。它可以帮助你查看码流的时间线、帧类型、GOP、NAL 单元、解析字段、十六进制数据、解码缩略图和运动矢量。
 
-The first milestone focuses on H.264/H.265 elementary streams and a CLI-first
-analysis pipeline. GUI, container demuxing, decoding, and deeper codec
-visualization will be added incrementally.
+当前发布目标是 Windows x64 桌面版，使用 Tauri 打包，安装后不需要单独安装 Node.js 或 FFmpeg。
 
-## Current Scope
+## 界面预览
 
-- H.264 Annex B NAL unit scanning
-- Basic CLI JSON output
-- CMake-based C++20 workspace
-- Testable core libraries
+![码流时间线、帧缩略图和 NAL 语法树](docs/screenshots/overview.png)
 
-See `docs/PRD.md`, `docs/ARCHITECTURE.md`, and `docs/CODEC-SCOPE.md` for the
-product and engineering boundaries.
+![帧详情、运动矢量和 Hex 数据](docs/screenshots/frame-detail.png)
 
-中文文档：
+## 下载 Windows 版本
 
-- `docs/PRD_CN.md`
-- `docs/ARCHITECTURE_CN.md`
-- `docs/CODEC-SCOPE_CN.md`
-- `docs/BUILD_CN.md`
-- `docs/CLI_CN.md`
-- `docs/ROADMAP_CN.md`
-- `docs/RELEASE_CN.md`
-- `AGENTS_CN.md`
+打开 GitHub 仓库的 **Releases** 页面，选择最新版本：
 
-## Build
+- `StreamView-*-x64-setup.exe` 或 `.msi`：安装版，推荐普通用户使用。
+- `StreamView-*-windows-x64-portable.zip`：免安装版，解压后运行 `run.bat`。
+- `SHA256SUMS.txt`：安装包校验值。
+
+Windows 10/11 x64 建议安装 WebView2 Runtime。如果系统已经安装 Microsoft Edge，通常已经具备该运行时。
+
+## 快速开始
+
+### 安装版
+
+1. 下载并运行安装包。
+2. 启动 StreamView。
+3. 点击“选择文件”，或者把视频码流拖入窗口。
+4. 选择文件后会自动开始分析。
+5. 点击时间线中的帧，查看帧详情、缩略图、运动矢量和对应 NAL。
+
+### 免安装版
+
+1. 解压 portable ZIP 到一个目录。
+2. 双击 `run.bat`。
+3. 浏览器打开后使用 StreamView Web 界面。
+4. 关闭时可以关闭浏览器页面和命令窗口。
+
+## 支持的输入
+
+| 类型 | 支持内容 |
+| --- | --- |
+| H.264 | `.h264`、`.264` Annex B 裸流 |
+| H.265/HEVC | `.h265`、`.265`、`.hevc` Annex B 裸流 |
+| 容器 | `.mp4`、`.mov`、`.m4v`、`.mkv`、`.webm`、`.ts` |
+
+容器输入由内置 FFmpeg 负责读取，分析结果仍然使用 StreamView 自己的码流分析模型。
+
+## 主要功能
+
+- H.264/H.265 NAL 单元扫描和基础语法解析。
+- SPS/PPS/VPS、slice、SEI 等已支持字段的展开查看。
+- 帧类型、帧大小、关键帧、GOP 和帧大小趋势时间线。
+- 点击时间线、左侧帧列表或缩略图浏览帧。
+- 解码当前帧并显示缩略图。
+- H.264 运动矢量叠加。
+- NAL 内容、解析字段和 Hex 数据查看。
+- 码流一致性检查。
+- 导出当前帧 PNG 和完整分析 JSON。
+- 中英文界面、深色/浅色主题、可调整面板布局。
+
+## HEVC 块级图层说明
+
+QP、CB 分区、帧内预测和 HEVC 运动图层依赖 libde265。为了让 Windows Lite 安装包保持独立和稳定，官方 Windows Lite 包默认不包含该可选依赖。
+
+这不影响普通 H.264/H.265 分析、解码缩略图、播放和 H.264 运动矢量功能。带 libde265 的自定义构建可以启用这些图层。
+
+## 常见问题
+
+### 选择文件后没有画面
+
+先确认文件确实是视频码流或包含视频流的容器。对于非常规格式，可以尝试先用 FFmpeg 转成 `.h264` 或 `.h265` Annex B 裸流。
+
+### Windows 提示端口被占用
+
+StreamView 桌面后端默认使用本机 `8799` 端口。关闭其他 StreamView 实例，或结束占用该端口的程序后重新启动。
+
+### 看到解析 warning 是不是视频坏了
+
+不一定。编码器经常会在关键帧前重复发送参数集。StreamView 只会把“同一参数集 ID 的内容发生变化”作为参数集重定义 warning；FFmpeg 能播放也不等于所有语法字段都已经被 StreamView 解析。
+
+## 从源码构建
+
+核心工程使用 CMake 和 C++20。Windows CI 会自动下载 FFmpeg、构建 CLI、运行测试，并打包 Tauri 安装程序。
+
+Linux/macOS 上构建核心 CLI：
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+本地启动 Web 版：
 
 ```bash
 cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake --build build --parallel
+cd apps/streamview-web
+node server.js
 ```
 
-## Real Sample Tests
+浏览器打开 `http://127.0.0.1:8787`。
 
-If `/home/zhangyp/code/media` exists, CMake automatically enables local smoke
-tests for:
+## GitHub 发布
 
-- `video_264_hd.h264`
-- `video_265_sd.h265`
-
-For another local media directory:
+推送版本标签后，GitHub Actions 会自动编译并创建 Windows Release：
 
 ```bash
-cmake -S . -B build -DSTREAMVIEW_REAL_MEDIA_DIR=/path/to/media
-ctest --test-dir build --output-on-failure
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
-These media files are not part of the repository.
+工作流会执行 C++ 测试、Web 后端健康检查、Tauri 打包，并上传安装版、免安装版和 SHA-256 校验文件。
 
-Optional FFmpeg demux support requires FFmpeg development packages
-(`libavformat`, `libavcodec`, `libavutil`) discoverable through `pkg-config`.
-If they are missing, the raw H.264 Annex B analyzer still builds. When present,
-container inputs (`.mp4`, `.mov`, `.m4v`, `.mkv`, `.webm`) are demuxed to Annex B
-and decoding (`decode` / the web UI) is enabled.
+## 当前边界
 
-Ubuntu/Debian:
+这是 StreamEye Lite 版本，不是完整的 H.264/H.265 标准验证器，也不提供 H.264 宏块级 QP、残差和完整预测模式解析。解析器会逐步扩展，每项语法扩展都会配套测试或 golden 输出。
 
-```bash
-sudo apt install libavformat-dev libavcodec-dev libavutil-dev pkg-config
-```
-
-Optional HEVC block-level overlays (per-block QP / CB partition / intra
-prediction / motion vectors, via `decode --block-layer` and the web UI's layer
-selector) require libde265. It is auto-detected through `pkg-config`; if missing,
-everything else still builds.
-
-```bash
-sudo apt install libde265-dev
-```
-
-## CLI
-
-```bash
-./build/apps/streamview-cli/streamview analyze samples/example.h264
-./build/apps/streamview-cli/streamview --version
-./build/apps/streamview-cli/streamview analyze samples/example.h264 --json out.json
-./build/apps/streamview-cli/streamview analyze samples/example.h264 --json summary.json --json-mode summary
-./build/apps/streamview-cli/streamview analyze samples/example.h264 --json first-nals.json --limit-nals 100
-./build/apps/streamview-cli/streamview analyze samples/example.h265 --codec h265 --format json --output -
-./build/apps/streamview-cli/streamview analyze samples/example.h264 --format text --output summary.txt
-./build/apps/streamview-cli/streamview inspect samples/example.h264 --nal 0
-./build/apps/streamview-cli/streamview inspect samples/example.h264 --frame 0
-./build/apps/streamview-cli/streamview inspect samples/example.h264 --gop 0
-./build/apps/streamview-cli/streamview errors samples/example.h264
-./build/apps/streamview-cli/streamview errors samples/example.h264 --json
-./build/apps/streamview-cli/streamview validate samples/example.h264
-./build/apps/streamview-cli/streamview validate samples/example.h264 --json
-./build/apps/streamview-cli/streamview dump samples/example.h264 --nal 0 --format hex
-./build/apps/streamview-cli/streamview dump samples/example.h264 --nal 0 --format payload --output nal0.bin
-./build/apps/streamview-cli/streamview decode samples/example.h264 --frame 3 --thumb f3.ppm --mv-json f3.json
-./build/apps/streamview-cli/streamview decode samples/example.h265 --frame 0 --block-layer qp --block-out qp.ppm
-```
-
-Without `--json`, the CLI prints a concise text summary, including parse error
-counts. With `--json`, it writes the full NAL/frame/GOP analysis model to the
-selected file. Use `--json-mode summary` for large streams when only the top
-level summary is needed. Use `--limit-nals` when only the first N NAL details
-are needed in full JSON. Use `inspect` to print one NAL/frame/GOP directly.
-Use `errors` to list parse failures quickly. Use `validate` to run basic
-scriptable stream checks. Use `dump` to export one NAL as hex text, raw payload
-bytes, or RBSP bytes.
-
-The newer output options are:
-
-- `--format text|json`: choose stdout/file output format.
-- `--output <path|->`: write to a file, or use `-` for stdout.
-- `--codec auto|h264|h265`: override codec detection when extension-based auto
-  detection is not enough.
-
-`--json <path>` is kept as a compatibility alias for `--format json --output
-<path>`.
-
-Use `decode` (requires FFmpeg) to decode one frame to a PPM thumbnail and export
-its per-block motion vectors as JSON — the data source behind the web UI's
-motion-vector overlay.
-
-## Web UI
-
-A cross-platform browser UI (playback, frame-type/size timeline, per-frame
-detail with a decoded thumbnail and motion-vector overlay, a bitstream tree, a
-per-frame NAL syntax + hex panel, and — for HEVC with libde265 — a layer selector
-for QP / CB partition / intra-prediction / motion overlays) lives in
-`apps/streamview-web`. It has zero runtime dependencies and reuses the
-`streamview` CLI + `ffmpeg`:
-
-```bash
-cmake -S . -B build && cmake --build build   # build the CLI first
-cd apps/streamview-web && node server.js      # http://localhost:8787
-```
-
-See `apps/streamview-web/README.md` for details.
-
-Exit codes:
-
-- `0`: command succeeded; `errors` found no parse errors.
-- `1`: invalid command line usage.
-- `2`: input, output, analysis, or inspect lookup failed.
-- `3`: `errors` command completed and found parse errors.
+许可证见 [LICENSE](LICENSE)。

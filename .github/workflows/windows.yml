@@ -8,7 +8,7 @@ name: Windows build (web-mode tool)
 on:
   workflow_dispatch:
   push:
-    branches: [ feat/sv-decode-web-gui ]
+    branches: [ main, feat/sv-decode-web-gui ]
 
 jobs:
   build:
@@ -31,7 +31,8 @@ jobs:
         shell: pwsh
         run: |
           cmake -B build -S . -DSTREAMVIEW_ENABLE_FFMPEG=ON -DFFMPEG_ROOT="$env:FFMPEG_DIR"
-          cmake --build build --config Release --target streamview
+          cmake --build build --config Release --parallel
+          ctest --test-dir build -C Release --output-on-failure
 
       - name: Fetch portable Node
         shell: pwsh
@@ -52,16 +53,7 @@ jobs:
           Copy-Item "$env:FFMPEG_DIR\bin\ffmpeg.exe" dist\
           Copy-Item $env:NODE_EXE dist\
           Copy-Item -Recurse apps\streamview-web dist\streamview-web
-          $bat = @"
-          @echo off
-          cd /d %~dp0
-          set STREAMVIEW_BIN=%~dp0streamview.exe
-          set FFMPEG_BIN=%~dp0ffmpeg.exe
-          set PORT=8787
-          start "" http://localhost:8787
-          "%~dp0node.exe" "%~dp0streamview-web\server.js"
-          "@
-          Set-Content -Path dist\run.bat -Value $bat -Encoding ascii
+          Copy-Item packaging\windows\run.bat dist\
 
       - uses: actions/upload-artifact@v4
         with:

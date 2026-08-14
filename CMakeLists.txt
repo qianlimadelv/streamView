@@ -20,10 +20,24 @@ if(STREAMVIEW_ENABLE_FFMPEG)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
         pkg_check_modules(FFMPEG QUIET IMPORTED_TARGET libavformat libavcodec libavutil)
-        # Optional: libde265 for HEVC block-level overlays (Phase 9b).
+        # Optional: libde265 for HEVC block-level overlays (Phase 9b). A stale
+        # pkg-config cache can report the library while its headers have gone
+        # away (for example after a temporary spike directory is removed), so
+        # require the public header before enabling the code path.
         pkg_check_modules(LIBDE265 QUIET IMPORTED_TARGET libde265)
         if(LIBDE265_FOUND)
-            message(STATUS "libde265 found; HEVC block-level overlays enabled")
+            find_path(LIBDE265_INCLUDE_DIR
+                NAMES libde265/de265.h
+                HINTS ${LIBDE265_INCLUDE_DIRS}
+            )
+            if(LIBDE265_INCLUDE_DIR AND EXISTS "${LIBDE265_INCLUDE_DIR}/libde265/de265.h")
+                set_property(TARGET PkgConfig::LIBDE265 APPEND PROPERTY
+                    INTERFACE_INCLUDE_DIRECTORIES "${LIBDE265_INCLUDE_DIR}")
+                message(STATUS "libde265 found; HEVC block-level overlays enabled")
+            else()
+                set(LIBDE265_FOUND FALSE)
+                message(STATUS "libde265 headers not found; HEVC block-level overlays disabled")
+            endif()
         else()
             message(STATUS "libde265 not found; HEVC block-level overlays disabled")
         endif()

@@ -7,7 +7,7 @@ const el = (id) => document.getElementById(id);
 // ---- i18n (中文默认 / English) --------------------------------------------
 const I18N = {
   zh: {
-    open_file: '📁 选择文件', analyze: 'Analyze', view_tree: '结构', view_detail: '详情',
+    open_file: '📁 选择文件', analyze: '分析', view_tree: '结构', view_detail: '详情',
     path_ph: '点「选择文件」浏览,或手动填绝对路径',
     tl_select: '时间线 · 选帧', keyframe: '关键帧', click_filter: '← 点击筛选',
     cur_frame: '当前帧', mv: 'MV', filter: '筛选',
@@ -25,7 +25,7 @@ const I18N = {
     m_coded: '编码尺寸', m_mv: '运动矢量', yes: '是', no: '否',
     frames_u: '帧', nal_u: 'NAL', gop_kf: '关键帧', ungrouped: '未分组', other: '其他',
     hex: '十六进制 (hex)', frame_size: '画面大小', theme: '日夜切换',
-    need_hevc: '块级图层需 HEVC', frame_word: '帧', avg: '平均', no_gop: '无 GOP 数据',
+    need_hevc: '块级图层需 HEVC', block_unavailable: '当前版本未打包 libde265', frame_word: '帧', avg: '平均', no_gop: '无 GOP 数据',
     exp_frame: '导出当前帧 PNG', exp_json: '导出分析 JSON', drop_hint: '浏览器版拖拽读不到路径,请用「选择文件」;桌面版支持拖拽',
     validate_title: '一致性校验', ok_clean: '未发现问题', sev_error: '错误', sev_warning: '警告',
     loading: '加载中…', hex_shown: '已显示前', hex_of: '共', hex_all: '显示全部',
@@ -49,7 +49,7 @@ const I18N = {
     m_coded: 'Coded', m_mv: 'Motion vectors', yes: 'yes', no: 'no',
     frames_u: 'frames', nal_u: 'NAL', gop_kf: 'keyframe', ungrouped: 'ungrouped', other: 'other',
     hex: 'Hex', frame_size: 'Image size', theme: 'Theme',
-    need_hevc: 'block layers need HEVC', frame_word: 'frame', avg: 'avg', no_gop: 'no GOP data',
+    need_hevc: 'block layers need HEVC', block_unavailable: 'libde265 is not included in this build', frame_word: 'frame', avg: 'avg', no_gop: 'no GOP data',
     exp_frame: 'Export frame PNG', exp_json: 'Export analysis JSON', drop_hint: 'Browser drag-drop can’t read the path — use “Open file”; the desktop app supports drag-drop',
     validate_title: 'Validation', ok_clean: 'No issues', sev_error: 'error', sev_warning: 'warning',
     loading: 'loading…', hex_shown: 'showing first', hex_of: 'of', hex_all: 'show all',
@@ -87,11 +87,24 @@ const state = {
   aus: [],         // access units (grouped NALs) for the bitstream tree
   thumbCache: {},  // decodeIndex -> base64 PPM, for the filmstrip
   stripStart: -1,  // current filmstrip window start
+  capabilities: { hevc_block_overlays: false },
 };
 
 const STRIP_COUNT = 9; // frames shown in the filmstrip at once
 
 function setStatus(msg) { el('status').textContent = msg; }
+
+async function loadCapabilities() {
+  try {
+    const res = await fetch('/api/health');
+    const capabilities = await res.json();
+    state.capabilities = capabilities;
+    if (state.analysis) configureLayerSelect(state.analysis.codec_guess);
+  } catch (e) {
+    // The UI remains usable for analysis even when the optional capability
+    // probe fails.
+  }
+}
 
 // ---- Server-side file browser ---------------------------------------------
 
@@ -160,7 +173,16 @@ async function analyze() {
   const path = el('path').value.trim();
   if (!path) return;
   state.path = path;
-  setStatus('analyzing…');
+  // Backend parse is atomic (no streamed progress), so show an eased pseudo
+  // progress + elapsed timer: reassures the user it's working, never claims 100%
+  // until the response actually lands. Absolute time is unchanged.
+  const started = Date.now();
+  const tick = setInterval(() => {
+    const s = (Date.now() - started) / 1000;
+    const pct = Math.round((1 - Math.exp(-s / 4)) * 95);
+    setStatus(`analyzing… ${pct}% · ${s.toFixed(1)}s`);
+  }, 150);
+  setStatus('analyzing… 0% · 0.0s');
   try {
     const res = await fetch('/api/analyze?path=' + encodeURIComponent(path));
     const data = await res.json();
@@ -180,6 +202,8 @@ async function analyze() {
     loadValidation(path);
   } catch (e) {
     setStatus('request failed: ' + e.message);
+  } finally {
+    clearInterval(tick);
   }
 }
 
@@ -228,11 +252,12 @@ function renderSummary(d) {
 // Block-level overlays are HEVC-only (libde265); disable them for other codecs.
 function configureLayerSelect(codec) {
   const hevc = codec === 'h265';
+  const blockLayers = hevc && state.capabilities.hevc_block_overlays === true;
   for (const opt of el('layerSelect').options) {
-    if (opt.value !== 'original') opt.disabled = !hevc;
+    if (opt.value !== 'original') opt.disabled = !blockLayers;
   }
-  if (!hevc && el('layerSelect').value !== 'original') el('layerSelect').value = 'original';
-  el('layerHint').textContent = hevc ? '' : t('need_hevc');
+  if (!blockLayers && el('layerSelect').value !== 'original') el('layerSelect').value = 'original';
+  el('layerHint').textContent = !hevc ? t('need_hevc') : (!blockLayers ? t('block_unavailable') : '');
 }
 
 function fmtBytes(n) {
@@ -933,6 +958,7 @@ if (Number(_params.get('zoom')) >= 1) state.zoom = Number(_params.get('zoom'));
   state.filter[t.toUpperCase()] = false;
 });
 syncFilterUI();
+loadCapabilities();
 if (initialPath) { el('path').value = initialPath; analyze(); }
 if (_params.get('browse') === '1') openBrowser();
 
