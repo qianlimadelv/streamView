@@ -37,10 +37,10 @@ brew install ffmpeg pkg-config
 
 ## Windows
 
-使用支持 C++20 的 Visual Studio 生成器：
+使用当前 Windows runner 上可用的 Visual Studio 生成器，目标架构为 x64：
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake -S . -B build -A x64
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
