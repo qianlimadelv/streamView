@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StreamView — bitstream analyzer</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --line: #2a2f3a;
+    --fg: #e6e9ef; --muted: #99a1b3; --accent: #4c8dff;
+    --i: #ff5b6a; --p: #4c8dff; --b: #8a94a6; --key: #ffd23f;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f9; --panel: #ffffff; --panel2: #eef1f5; --line: #d6dbe4;
+    --fg: #1a1d24; --muted: #667085; --accent: #2563eb;
+    --i: #e5484d; --p: #2563eb; --b: #7c8698; --key: #c98a00;
+  }
+  .view-toggle { display: flex; gap: 3px; }
+  .vt { background: var(--panel2); border: 1px solid var(--line); color: var(--muted);
+    padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .vt.sel { color: var(--fg); border-color: var(--accent); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 13px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  header { padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--line);
+    display: flex; gap: 8px; align-items: center; }
+  header h1 { font-size: 14px; margin: 0 12px 0 0; font-weight: 600; letter-spacing: .3px; }
+  input[type=text] { flex: 1; background: var(--panel2); border: 1px solid var(--line);
+    color: var(--fg); padding: 6px 10px; border-radius: 6px; font: inherit; }
+  button { background: var(--accent); color: #fff; border: 0; padding: 6px 14px;
+    border-radius: 6px; cursor: pointer; font: inherit; }
+  button.secondary { background: var(--panel2); border: 1px solid var(--line); color: var(--fg); }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { color: var(--muted); font-size: 12px; }
+  #app { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 8px; gap: 8px; box-sizing: border-box; }
+  #topbar { flex: 0 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .tl-head { display: flex; align-items: center; gap: 16px; margin-bottom: 6px; }
+  .tl-title { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .tl-zoom { margin-left: auto; display: flex; gap: 4px; }
+  .fuse-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; flex-wrap: wrap; }
+  .fuse-divider { border-top: 1px dashed var(--accent); margin: 16px 0 10px; text-align: center; }
+  .fuse-divider span { display: inline-block; transform: translateY(-50%); background: var(--panel);
+    padding: 0 12px; color: var(--accent); font-size: 12px; letter-spacing: .5px; }
+  .fuse-divider b { color: var(--fg); }
+  #cols { flex: 1; display: grid; --wL: 280px; --wR: 400px;
+    grid-template-columns: var(--wL) 6px minmax(280px, 1fr) 6px var(--wR); min-height: 0; }
+  .col { overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .col h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 0 0 10px; }
+  .col .tree { max-height: none; }
+  .splitter { cursor: col-resize; }
+  .splitter:hover { background: var(--accent); opacity: .6; border-radius: 3px; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 0 0 8px; position: sticky; top: -10px; background: var(--panel); z-index: 1; }
+  .tab { background: transparent; border: 0; color: var(--muted); padding: 7px 14px; cursor: pointer; border-bottom: 2px solid transparent; font: inherit; }
+  .tab.sel { color: var(--fg); border-bottom-color: var(--accent); }
+  .pane-title { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 8px; }
+  .valbox { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; background: var(--panel2); }
+  .valbox h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+  .valbox.ok h3 { color: var(--muted); }
+  .issue { font-size: 12px; padding: 3px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .issue.muted { color: var(--muted); }
+  .issue .sev { font-size: 10px; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; color: #fff; }
+  .issue .sev-error { background: #e5484d; }
+  .issue .sev-warning { background: #c98a00; }
+  .issue code { color: var(--muted); font-size: 11px; }
+  .hex-more { color: var(--muted); margin-bottom: 6px; }
+  .hex-more a { color: var(--accent); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; position: relative; }
+  .drag-handle { cursor: grab; color: var(--muted); margin-right: 7px; font-weight: 400; user-select: none; }
+  .drag-handle:active { cursor: grabbing; }
+  .panel-close { position: absolute; top: 8px; right: 10px; background: transparent; border: 0;
+    color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 5px; z-index: 2; line-height: 1; }
+  .panel-close:hover { color: var(--i); }
+  .panel.dragging { opacity: .5; outline: 2px dashed var(--accent); }
+  .panels-menu { position: absolute; display: none; background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 8px; z-index: 40; min-width: 190px; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+  .panels-menu.open { display: block; }
+  .panels-menu label { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+  .panels-menu label:hover { background: var(--panel); }
+  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .6px;
+    color: var(--muted); margin: 0 0 10px; }
+  video { width: 100%; background: #000; border-radius: 6px; max-height: 300px; }
+  #summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+  .fd-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .fd-row { grid-template-columns: 1fr; } }
+  .stat { background: var(--panel2); border-radius: 6px; padding: 8px 10px; }
+  .stat .k { color: var(--muted); font-size: 11px; }
+  .stat .v { font-size: 15px; font-weight: 600; }
+  #timelineWrap { grid-column: 1 / -1; }
+  #filmstripPanel { grid-column: 1 / -1; }
+  #panelPlayback { grid-column: 1 / -1; }
+  #overview .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  #overview .kpi { background: var(--panel2); border-radius: 8px; padding: 10px 12px; }
+  #overview .kpi .k { color: var(--muted); font-size: 11px; }
+  #overview .kpi .v { font-size: 19px; font-weight: 600; margin-top: 2px; }
+  #overview .kpi .v small { font-size: 12px; color: var(--muted); font-weight: 400; }
+  #overview .sub { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  #overview .sub h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 0 0 6px; }
+  #overview .row2 { display: flex; justify-content: space-between; border-bottom: 1px dotted var(--line); padding: 3px 0; font-size: 13px; }
+  #overview .row2 .k { color: var(--muted); }
+  #overview .bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 3px; }
+  #overview .bar > span { display: block; height: 100%; }
+  details.au.au-current { border-color: var(--accent); }
+  #filmstrip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px; min-height: 92px; }
+  .thumb { flex: 0 0 auto; cursor: pointer; border: 2px solid transparent; border-radius: 6px;
+    padding: 2px; text-align: center; }
+  .thumb:hover { border-color: var(--line); }
+  .thumb.sel { border-color: var(--accent); }
+  .thumb canvas { display: block; background: #000; border-radius: 4px; }
+  .thumb .thumb-label { font-size: 10px; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+  .thumb.sel .thumb-label { color: var(--fg); }
+  #timeline { height: 130px; display: block; cursor: pointer;
+    background: var(--panel2); border-radius: 6px; }
+  #timelineScroll { overflow-x: auto; }
+  .legend { display: flex; gap: 14px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .ftype { cursor: pointer; user-select: none; }
+  .ftype.off { opacity: .38; text-decoration: line-through; }
+  .tree-filter { float: right; display: flex; gap: 5px; align-items: center; font-weight: 400; }
+  .ftype2 { cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--muted);
+    border-radius: 4px; padding: 1px 9px; font-size: 12px; }
+  .ftype2.sel { color: var(--c); border-color: var(--c); }
+  #frameCanvas { height: var(--frameH, 360px); width: auto; max-width: 100%; display: block;
+    background: #000; border-radius: 6px; image-rendering: auto; }
+  #frameMeta { display: flex; flex-wrap: wrap; gap: 5px 22px; margin-top: 10px; }
+  #frameMeta > div { display: flex; gap: 6px; font-size: 12px; }
+  #frameMeta .k { color: var(--muted); }
+  #frameMeta div { display: flex; justify-content: space-between; border-bottom: 1px dotted var(--line); padding: 2px 0; }
+  #frameMeta .k { color: var(--muted); }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  label.chk { color: var(--muted); user-select: none; }
+  select#layerSelect { background: var(--panel2); border: 1px solid var(--line); color: var(--fg);
+    padding: 6px 8px; border-radius: 6px; font: inherit; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    align-items: center; justify-content: center; z-index: 30; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    width: min(680px, 92vw); max-height: 82vh; display: flex; flex-direction: column; }
+  .modal-head { display: flex; justify-content: space-between; align-items: center;
+    gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  #browserPath { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .browser-list { overflow: auto; padding: 6px; }
+  .browser-item { padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex;
+    gap: 9px; align-items: center; font-size: 13px; }
+  .browser-item:hover { background: var(--panel2); }
+  .browser-item.file { color: var(--accent); }
+  .browser-item .ic { width: 16px; text-align: center; }
+  #tooltip { position: fixed; display: none; pointer-events: none; z-index: 20;
+    background: var(--panel2); border: 1px solid var(--line); color: var(--fg);
+    padding: 4px 8px; border-radius: 5px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+  .tree { max-height: 340px; overflow: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  details.gop { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 5px; background: var(--panel2); }
+  details.gop > summary { cursor: pointer; padding: 8px 10px; list-style: none; display: flex; gap: 8px; align-items: center; font-size: 12px; }
+  details.gop > summary::-webkit-details-marker { display: none; }
+  .gop-body { padding: 4px 6px 6px; }
+  details.au { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 5px; background: var(--panel2); }
+  details.au > summary { cursor: pointer; padding: 7px 10px; list-style: none; display: flex; gap: 8px; align-items: center; font-size: 12px; }
+  details.au > summary::-webkit-details-marker { display: none; }
+  .au-body { padding: 4px 8px 8px; }
+  .au-body details.nal { background: var(--panel); }
+  details.nal { border: 1px solid var(--line); border-radius: 6px; margin-bottom: 6px; background: var(--panel2); }
+  details.nal > summary { cursor: pointer; padding: 6px 10px; list-style: none; display: flex; gap: 8px; align-items: center; }
+  details.nal > summary::-webkit-details-marker { display: none; }
+  .tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; color: #fff; font-family: system-ui; }
+  .kvtable { padding: 4px 10px 8px; }
+  .kvtable .row { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dotted var(--line); padding: 1px 0; }
+  .kvtable .row .k { color: var(--muted); }
+  .kvtable .grouphdr { color: var(--accent); margin-top: 6px; font-family: system-ui; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  .pserr { color: var(--i); }
+  .hex { margin: 4px 10px 10px; padding: 8px; background: #0b0d12; border-radius: 5px;
+    white-space: pre; overflow-x: auto; color: #b9c2d0; font-size: 11px; max-height: 180px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>StreamView</h1>
+  <input id="path" type="text" data-i18n-ph="path_ph" placeholder="点「选择文件」浏览,或手动填绝对路径" />
+  <button id="browse" class="secondary" data-i18n="open_file">📁 选择文件</button>
+  <button id="load" data-i18n="analyze">Analyze</button>
+  <span class="view-toggle">
+    <button data-view="tree" class="vt sel" data-i18n="view_tree">结构</button>
+    <button data-view="detail" class="vt sel" data-i18n="view_detail">详情</button>
+  </span>
+  <button id="exportJson" class="secondary" data-i18n-title="exp_json" title="导出分析 JSON">⤓</button>
+  <button id="langBtn" class="secondary" title="中 / EN">EN</button>
+  <button id="themeBtn" class="secondary" data-i18n-title="theme" title="日夜切换">🌙</button>
+  <span id="valBadge" style="display:none;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;cursor:default"></span>
+  <span id="status">idle</span>
+</header>
+
+<main id="app">
+  <div id="cols">
+    <div class="col" id="colTree">
+      <h2><span data-i18n="tree_title">码流结构树</span>
+        <span class="tree-filter">
+          <span style="color:var(--muted);font-size:11px;font-weight:400;" data-i18n="filter">筛选</span>
+          <button class="ftype2 sel" data-type="I" style="--c:var(--i)">I</button>
+          <button class="ftype2 sel" data-type="P" style="--c:var(--p)">P</button>
+          <button class="ftype2 sel" data-type="B" style="--c:var(--b)">B</button>
+        </span>
+      </h2>
+      <div id="streamTree" class="tree"></div>
+    </div>
+
+    <div class="splitter" data-split="L"></div>
+
+    <div class="col" id="colFrame">
+      <div class="fuse-head">
+        <span class="tl-title" data-i18n="tl_select">时间线 · 选帧</span>
+        <span class="legend">
+          <span class="ftype" data-type="I"><i class="swatch" style="background:var(--i)"></i>I</span>
+          <span class="ftype" data-type="P"><i class="swatch" style="background:var(--p)"></i>P</span>
+          <span class="ftype" data-type="B"><i class="swatch" style="background:var(--b)"></i>B</span>
+          <span><i class="swatch" style="background:var(--key)"></i><span data-i18n="keyframe">关键帧</span></span>
+        </span>
+        <span class="tl-zoom">
+          <button id="zoomOut" class="secondary" title="缩小">−</button>
+          <button id="zoomIn" class="secondary" title="放大">＋</button>
+          <button id="zoomReset" class="secondary" title="重置">1:1</button>
+        </span>
+      </div>
+      <div id="timelineScroll" style="overflow-x:auto;">
+        <canvas id="timeline" height="88"></canvas>
+      </div>
+      <div id="filmstrip"></div>
+
+      <div class="fuse-divider"><span>↓ <span data-i18n="cur_frame">当前帧</span> <b id="frameTitle"></b></span></div>
+
+      <div class="toolbar">
+        <button id="prev" class="secondary">◀</button>
+        <button id="next" class="secondary">▶</button>
+        <select id="layerSelect" title="显示图层">
+          <option value="original" data-i18n="layer_original">原图 + MV</option>
+          <option value="qp" data-i18n="layer_qp">QP 热力 (HEVC)</option>
+          <option value="partition" data-i18n="layer_partition">CB 分区 (HEVC)</option>
+          <option value="intra" data-i18n="layer_intra">帧内预测 (HEVC)</option>
+          <option value="motion" data-i18n="layer_motion">运动矢量 (HEVC)</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="mvToggle" checked /> <span data-i18n="mv">MV</span></label>
+        <button id="exportFrame" class="secondary" data-i18n-title="exp_frame" title="导出当前帧 PNG">📷</button>
+        <input type="range" id="frameSize" min="200" max="720" value="360" data-i18n-title="frame_size" title="画面大小" style="width:110px" />
+        <span id="layerHint" style="color:var(--muted);font-size:11px;"></span>
+      </div>
+      <canvas id="frameCanvas" width="360" height="240"></canvas>
+    </div>
+
+    <div class="splitter" data-split="R"></div>
+
+    <div class="col" id="colDetail">
+      <div class="tabs">
+        <button class="tab sel" data-tab="content" data-i18n="tab_content">码流内容</button>
+        <button class="tab" data-tab="overview" data-i18n="tab_overview">码流总览</button>
+        <button class="tab" data-tab="playback" data-i18n="tab_playback">播放</button>
+      </div>
+      <div class="tabpane" data-pane="content">
+        <div class="pane-title"><span data-i18n="tab_content">码流内容</span> <span id="nalTitle" style="text-transform:none;letter-spacing:0;"></span></div>
+        <div id="nalList" class="tree"></div>
+      </div>
+      <div class="tabpane" data-pane="overview" hidden>
+        <div id="overview"></div>
+      </div>
+      <div class="tabpane" data-pane="playback" hidden>
+        <video id="player" controls></video>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="tooltip"></div>
+
+<div id="browser" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <span id="browserPath"></span>
+      <button id="browserClose" class="secondary">✕</button>
+    </div>
+    <div id="browserList" class="browser-list"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

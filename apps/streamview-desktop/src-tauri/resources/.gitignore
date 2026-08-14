@@ -1,0 +1,3 @@
+# CI populates this at build time with node.exe / streamview.exe / ffmpeg / web.
+*
+!.gitignore

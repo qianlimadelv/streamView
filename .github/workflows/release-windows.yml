@@ -1,0 +1,132 @@
+name: Release Windows desktop
+
+# Push a tag such as v0.1.0 to build and publish the Windows Lite release.
+# The release contains the self-contained Tauri installer and a portable ZIP.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      FFMPEG_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip
+      NODE_URL: https://nodejs.org/dist/v20.18.0/node-v20.18.0-win-x64.zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch FFmpeg
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 3 -o ffmpeg.zip $env:FFMPEG_URL
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
+          $dir = (Get-ChildItem ffmpeg -Directory | Select-Object -First 1).FullName
+          "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$dir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          if (-not (Test-Path "$dir\bin\ffmpeg.exe")) { throw "FFmpeg executable was not found" }
+
+      - name: Configure, build, and test C++ core
+        shell: pwsh
+        run: |
+          cmake -B build -S . -DSTREAMVIEW_ENABLE_FFMPEG=ON -DSTREAMVIEW_BUILD_TESTS=ON -DFFMPEG_ROOT="$env:FFMPEG_DIR"
+          cmake --build build --config Release --parallel
+          ctest --test-dir build -C Release --output-on-failure
+
+      - name: Fetch portable Node
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 3 -o node.zip $env:NODE_URL
+          Expand-Archive node.zip -DestinationPath nodedist
+          $nodeexe = (Get-ChildItem nodedist -Recurse -Filter node.exe | Select-Object -First 1).FullName
+          if (-not $nodeexe) { throw "Node executable was not found" }
+          "NODE_EXE=$nodeexe" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Stage desktop resources
+        shell: pwsh
+        run: |
+          $r = "apps/streamview-desktop/src-tauri/resources"
+          New-Item -ItemType Directory -Force $r | Out-Null
+          $exe = Get-ChildItem build -Recurse -Filter streamview.exe | Where-Object { $_.FullName -match "[\\/]Release[\\/]" } | Select-Object -First 1
+          if (-not $exe) { throw "streamview.exe was not built" }
+          Copy-Item $exe.FullName "$r\"
+          Copy-Item "$env:FFMPEG_DIR\bin\*.dll" "$r\"
+          Copy-Item "$env:FFMPEG_DIR\bin\ffmpeg.exe" "$r\"
+          Copy-Item $env:NODE_EXE "$r\"
+          New-Item -ItemType Directory -Force "$r\streamview-web" | Out-Null
+          Copy-Item apps\streamview-web\server.js "$r\streamview-web\"
+          Copy-Item -Recurse apps\streamview-web\public "$r\streamview-web\public"
+
+      - name: Check the bundled local backend
+        shell: pwsh
+        run: |
+          $env:STREAMVIEW_BIN = (Resolve-Path "apps/streamview-desktop/src-tauri/resources/streamview.exe").Path
+          $env:FFMPEG_BIN = (Resolve-Path "apps/streamview-desktop/src-tauri/resources/ffmpeg.exe").Path
+          $env:PORT = "8787"
+          $server = Start-Process -FilePath $env:NODE_EXE `
+            -ArgumentList "apps/streamview-web/server.js" -WorkingDirectory (Get-Location) `
+            -PassThru -WindowStyle Hidden
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 50; $i++) {
+              try {
+                $health = Invoke-RestMethod "http://127.0.0.1:8787/api/health"
+                if ($health.ok) { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 200 }
+            }
+            if (-not $ready) { throw "Bundled web backend did not become ready" }
+          } finally {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri dependencies
+        working-directory: apps/streamview-desktop
+        run: npm ci
+
+      - name: Build Tauri installer
+        working-directory: apps/streamview-desktop
+        run: npx tauri build --ci --verbose
+
+      - name: Assemble release assets
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $stage = Join-Path $env:RUNNER_TEMP "streamview-$version-windows-x64"
+          $dist = "release-assets"
+          New-Item -ItemType Directory -Force $stage, $dist | Out-Null
+          Copy-Item README.md, LICENSE "$stage\"
+          Copy-Item -Recurse apps\streamview-web "$stage\streamview-web"
+          Copy-Item (Resolve-Path "apps/streamview-desktop/src-tauri/resources/*") "$stage\" -Recurse
+          Copy-Item packaging\windows\run.bat "$stage\"
+          $zip = "$dist\StreamView-$version-windows-x64-portable.zip"
+          Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
+
+          $bundle = "apps/streamview-desktop/src-tauri/target"
+          $msi = Get-ChildItem -Recurse $bundle -Filter *.msi | Where-Object { $_.FullName -match "[\\/]bundle[\\/]" } | Select-Object -First 1
+          if (-not $msi) { throw "Tauri MSI was not produced" }
+          Copy-Item $msi.FullName "$dist\StreamView-$version-windows-x64.msi"
+          $setup = Get-ChildItem -Recurse $bundle -Filter *.exe | Where-Object { $_.FullName -match "[\\/]bundle[\\/]" } | Select-Object -First 1
+          if ($setup) { Copy-Item $setup.FullName "$dist\StreamView-$version-windows-x64-setup.exe" }
+          Get-ChildItem $dist -File | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash)  $($_.Path | Split-Path -Leaf)" } | Set-Content "$dist\SHA256SUMS.txt"
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $assets = @(Get-ChildItem release-assets -File | ForEach-Object { $_.FullName })
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag @assets --clobber
+          } else {
+            gh release create $tag @assets --title "StreamView $tag" --generate-notes
+          }

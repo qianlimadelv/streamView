@@ -1,6 +1,6 @@
 #include "streamview/analysis/validation.hpp"
 
-#include <set>
+#include <map>
 #include <utility>
 
 namespace streamview::analysis {
@@ -18,20 +18,25 @@ void add_issue(std::vector<ValidationIssue>& issues, std::string severity, std::
 
 std::vector<ValidationIssue> validate_stream_analysis(const StreamAnalysis& analysis) {
     std::vector<ValidationIssue> issues;
-    std::set<std::uint32_t> h264_sps_ids;
-    std::set<std::uint32_t> h264_pps_ids;
-    std::set<std::uint32_t> h265_vps_ids;
-    std::set<std::uint32_t> h265_sps_ids;
-    std::set<std::uint32_t> h265_pps_ids;
+    std::map<std::uint32_t, bitstream::H264SpsInfo> h264_sps_by_id;
+    std::map<std::uint32_t, bitstream::H264PpsInfo> h264_pps_by_id;
+    std::map<std::uint32_t, bitstream::H265VpsInfo> h265_vps_by_id;
+    std::map<std::uint32_t, bitstream::H265SpsInfo> h265_sps_by_id;
+    std::map<std::uint32_t, bitstream::H265PpsInfo> h265_pps_by_id;
     std::optional<std::pair<std::uint32_t, std::uint32_t>> h264_resolution;
     std::optional<std::pair<std::uint32_t, std::uint32_t>> h265_resolution;
 
     for (const auto& nal : analysis.nals) {
         if (nal.h264.has_value()) {
             if (nal.h264->sps.has_value()) {
-                const auto [_, inserted] = h264_sps_ids.insert(nal.h264->sps->seq_parameter_set_id);
-                if (!inserted) {
-                    add_issue(issues, "warning", "duplicate_h264_sps_id", "H.264 SPS id is defined more than once");
+                const auto id = nal.h264->sps->seq_parameter_set_id;
+                const auto existing = h264_sps_by_id.find(id);
+                if (existing == h264_sps_by_id.end()) {
+                    h264_sps_by_id.emplace(id, *nal.h264->sps);
+                } else if (existing->second != *nal.h264->sps) {
+                    add_issue(issues, "warning", "redefined_h264_sps_id",
+                              "H.264 SPS id is redefined with different values");
+                    existing->second = *nal.h264->sps;
                 }
                 const auto current_resolution = std::pair<std::uint32_t, std::uint32_t>{
                     nal.h264->sps->width,
@@ -47,23 +52,38 @@ std::vector<ValidationIssue> validate_stream_analysis(const StreamAnalysis& anal
                 }
             }
             if (nal.h264->pps.has_value()) {
-                const auto [_, inserted] = h264_pps_ids.insert(nal.h264->pps->pic_parameter_set_id);
-                if (!inserted) {
-                    add_issue(issues, "warning", "duplicate_h264_pps_id", "H.264 PPS id is defined more than once");
+                const auto id = nal.h264->pps->pic_parameter_set_id;
+                const auto existing = h264_pps_by_id.find(id);
+                if (existing == h264_pps_by_id.end()) {
+                    h264_pps_by_id.emplace(id, *nal.h264->pps);
+                } else if (existing->second != *nal.h264->pps) {
+                    add_issue(issues, "warning", "redefined_h264_pps_id",
+                              "H.264 PPS id is redefined with different values");
+                    existing->second = *nal.h264->pps;
                 }
             }
         }
         if (nal.h265.has_value()) {
             if (nal.h265->vps.has_value()) {
-                const auto [_, inserted] = h265_vps_ids.insert(nal.h265->vps->video_parameter_set_id);
-                if (!inserted) {
-                    add_issue(issues, "warning", "duplicate_h265_vps_id", "H.265 VPS id is defined more than once");
+                const auto id = nal.h265->vps->video_parameter_set_id;
+                const auto existing = h265_vps_by_id.find(id);
+                if (existing == h265_vps_by_id.end()) {
+                    h265_vps_by_id.emplace(id, *nal.h265->vps);
+                } else if (existing->second != *nal.h265->vps) {
+                    add_issue(issues, "warning", "redefined_h265_vps_id",
+                              "H.265 VPS id is redefined with different values");
+                    existing->second = *nal.h265->vps;
                 }
             }
             if (nal.h265->sps.has_value()) {
-                const auto [_, inserted] = h265_sps_ids.insert(nal.h265->sps->seq_parameter_set_id);
-                if (!inserted) {
-                    add_issue(issues, "warning", "duplicate_h265_sps_id", "H.265 SPS id is defined more than once");
+                const auto id = nal.h265->sps->seq_parameter_set_id;
+                const auto existing = h265_sps_by_id.find(id);
+                if (existing == h265_sps_by_id.end()) {
+                    h265_sps_by_id.emplace(id, *nal.h265->sps);
+                } else if (existing->second != *nal.h265->sps) {
+                    add_issue(issues, "warning", "redefined_h265_sps_id",
+                              "H.265 SPS id is redefined with different values");
+                    existing->second = *nal.h265->sps;
                 }
                 const auto current_resolution = std::pair<std::uint32_t, std::uint32_t>{
                     nal.h265->sps->width,
@@ -79,9 +99,14 @@ std::vector<ValidationIssue> validate_stream_analysis(const StreamAnalysis& anal
                 }
             }
             if (nal.h265->pps.has_value()) {
-                const auto [_, inserted] = h265_pps_ids.insert(nal.h265->pps->pic_parameter_set_id);
-                if (!inserted) {
-                    add_issue(issues, "warning", "duplicate_h265_pps_id", "H.265 PPS id is defined more than once");
+                const auto id = nal.h265->pps->pic_parameter_set_id;
+                const auto existing = h265_pps_by_id.find(id);
+                if (existing == h265_pps_by_id.end()) {
+                    h265_pps_by_id.emplace(id, *nal.h265->pps);
+                } else if (existing->second != *nal.h265->pps) {
+                    add_issue(issues, "warning", "redefined_h265_pps_id",
+                              "H.265 PPS id is redefined with different values");
+                    existing->second = *nal.h265->pps;
                 }
             }
         }
@@ -142,14 +167,15 @@ std::vector<ValidationIssue> validate_stream_analysis(const StreamAnalysis& anal
         if (!nal.h264.has_value()) {
             continue;
         }
-        if (nal.h264->pps.has_value() && h264_sps_ids.find(nal.h264->pps->seq_parameter_set_id) == h264_sps_ids.end()) {
+        if (nal.h264->pps.has_value() &&
+            h264_sps_by_id.find(nal.h264->pps->seq_parameter_set_id) == h264_sps_by_id.end()) {
             add_issue(issues,
                       "error",
                       "h264_pps_references_missing_sps",
                       "H.264 PPS references an SPS id that was not parsed");
         }
         if (nal.h264->slice.has_value() &&
-            h264_pps_ids.find(nal.h264->slice->pic_parameter_set_id) == h264_pps_ids.end()) {
+            h264_pps_by_id.find(nal.h264->slice->pic_parameter_set_id) == h264_pps_by_id.end()) {
             add_issue(issues,
                       "error",
                       "h264_slice_references_missing_pps",
@@ -170,21 +196,21 @@ std::vector<ValidationIssue> validate_stream_analysis(const StreamAnalysis& anal
             continue;
         }
         if (nal.h265->sps.has_value() &&
-            h265_vps_ids.find(nal.h265->sps->video_parameter_set_id) == h265_vps_ids.end()) {
+            h265_vps_by_id.find(nal.h265->sps->video_parameter_set_id) == h265_vps_by_id.end()) {
             add_issue(issues,
                       "error",
                       "h265_sps_references_missing_vps",
                       "H.265 SPS references a VPS id that was not parsed");
         }
         if (nal.h265->pps.has_value() &&
-            h265_sps_ids.find(nal.h265->pps->seq_parameter_set_id) == h265_sps_ids.end()) {
+            h265_sps_by_id.find(nal.h265->pps->seq_parameter_set_id) == h265_sps_by_id.end()) {
             add_issue(issues,
                       "error",
                       "h265_pps_references_missing_sps",
                       "H.265 PPS references an SPS id that was not parsed");
         }
         if (nal.h265->slice.has_value() &&
-            h265_pps_ids.find(nal.h265->slice->slice_pic_parameter_set_id) == h265_pps_ids.end()) {
+            h265_pps_by_id.find(nal.h265->slice->slice_pic_parameter_set_id) == h265_pps_by_id.end()) {
             add_issue(issues,
                       "error",
                       "h265_slice_references_missing_pps",

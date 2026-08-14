@@ -171,6 +171,10 @@ StreamAnalysis analyze_h265_annex_b(std::string input_path, std::span<const std:
                     nal.h265->slice_parse_error = slice.status.message();
                     add_parse_error(analysis.summary, &ParseErrorStats::slice);
                 }
+            } else if (nal.h265->header.nal_unit_type == bitstream::H265NalType::PrefixSei ||
+                       nal.h265->header.nal_unit_type == bitstream::H265NalType::SuffixSei) {
+                const auto payload = data.subspan(unit.payload_offset, unit.payload_size);
+                nal.h265->sei_messages = bitstream::parse_sei_messages(payload, 2);
             }
         }
 

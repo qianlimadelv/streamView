@@ -1,0 +1,62 @@
+name: Windows build (web-mode tool)
+
+# Builds streamview.exe on a Windows runner and bundles it with ffmpeg, a
+# portable Node, the web front-end and a run.bat launcher into a zip artifact.
+# No Windows toolchain needed on your machine — download the artifact, unzip,
+# double-click run.bat.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, feat/sv-decode-web-gui ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch FFmpeg (BtbN shared build)
+        shell: pwsh
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip"
+          curl.exe -L -o ffmpeg.zip $url
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
+          $dir = (Get-ChildItem ffmpeg -Directory | Select-Object -First 1).FullName
+          "FFMPEG_DIR=$dir" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$dir\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          Write-Host "FFmpeg extracted to $dir"
+          Get-ChildItem "$dir\lib" | Select-Object -First 8 Name
+
+      - name: Configure & build streamview.exe
+        shell: pwsh
+        run: |
+          cmake -B build -S . -DSTREAMVIEW_ENABLE_FFMPEG=ON -DFFMPEG_ROOT="$env:FFMPEG_DIR"
+          cmake --build build --config Release --parallel
+          ctest --test-dir build -C Release --output-on-failure
+
+      - name: Fetch portable Node
+        shell: pwsh
+        run: |
+          $url = "https://nodejs.org/dist/v20.18.0/node-v20.18.0-win-x64.zip"
+          curl.exe -L -o node.zip $url
+          Expand-Archive node.zip -DestinationPath nodedist
+          $nodeexe = (Get-ChildItem nodedist -Recurse -Filter node.exe | Select-Object -First 1).FullName
+          "NODE_EXE=$nodeexe" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Stage distributable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist | Out-Null
+          $exe = Get-ChildItem build -Recurse -Filter streamview.exe | Select-Object -First 1
+          Copy-Item $exe.FullName dist\
+          Copy-Item "$env:FFMPEG_DIR\bin\*.dll" dist\
+          Copy-Item "$env:FFMPEG_DIR\bin\ffmpeg.exe" dist\
+          Copy-Item $env:NODE_EXE dist\
+          Copy-Item -Recurse apps\streamview-web dist\streamview-web
+          Copy-Item packaging\windows\run.bat dist\
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: streamview-windows
+          path: dist

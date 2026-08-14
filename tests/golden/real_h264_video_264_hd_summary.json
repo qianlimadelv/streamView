@@ -1,7 +1,7 @@
 {
   "format": "annex_b",
   "codec_guess": "h264",
-  "input": "/home/zhangyp/code/media/video_264_hd.h264",
+  "input": "video_264_hd.h264",
   "size_bytes": 11065137,
   "nal_count": 3628,
   "stream_summary": {

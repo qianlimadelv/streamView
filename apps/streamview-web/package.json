@@ -1,0 +1,11 @@
+{
+  "name": "streamview-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser UI for StreamView bitstream analysis (zero runtime dependencies)",
+  "bin": { "streamview-web": "server.js" },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=16" }
+}

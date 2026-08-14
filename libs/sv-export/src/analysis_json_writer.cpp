@@ -187,7 +187,23 @@ void write_sps_json(std::ostream& out, const bitstream::H264SpsInfo& sps) {
     out << "          \"width\": " << sps.width << ",\n";
     out << "          \"height\": " << sps.height << ",\n";
     out << "          \"frame_mbs_only_flag\": " << (sps.frame_mbs_only_flag ? "true" : "false") << ",\n";
-    out << "          \"frame_cropping_flag\": " << (sps.frame_cropping_flag ? "true" : "false") << "\n";
+    out << "          \"frame_cropping_flag\": " << (sps.frame_cropping_flag ? "true" : "false");
+    if (sps.vui.has_value()) {
+        const auto& v = *sps.vui;
+        out << ",\n          \"vui\": {\n";
+        out << "            \"aspect_ratio_idc\": " << static_cast<int>(v.aspect_ratio_idc) << ",\n";
+        out << "            \"video_full_range_flag\": " << (v.video_full_range_flag ? "true" : "false") << ",\n";
+        out << "            \"colour_primaries\": " << static_cast<int>(v.colour_primaries) << ",\n";
+        out << "            \"transfer_characteristics\": " << static_cast<int>(v.transfer_characteristics) << ",\n";
+        out << "            \"matrix_coefficients\": " << static_cast<int>(v.matrix_coefficients) << ",\n";
+        out << "            \"timing_info_present\": " << (v.timing_info_present_flag ? "true" : "false") << ",\n";
+        out << "            \"num_units_in_tick\": " << v.num_units_in_tick << ",\n";
+        out << "            \"time_scale\": " << v.time_scale << ",\n";
+        out << "            \"fixed_frame_rate_flag\": " << (v.fixed_frame_rate_flag ? "true" : "false") << "\n";
+        out << "          }\n";
+    } else {
+        out << "\n";
+    }
     out << "        }\n";
 }
 
@@ -235,7 +251,22 @@ void write_h265_sps_json(std::ostream& out, const bitstream::H265SpsInfo& sps) {
     out << "          \"log2_max_pic_order_cnt_lsb_minus4\": " << sps.log2_max_pic_order_cnt_lsb_minus4 << ",\n";
     out << "          \"width\": " << sps.width << ",\n";
     out << "          \"height\": " << sps.height << ",\n";
-    out << "          \"conformance_window_flag\": " << (sps.conformance_window_flag ? "true" : "false") << "\n";
+    out << "          \"conformance_window_flag\": " << (sps.conformance_window_flag ? "true" : "false");
+    if (sps.vui.has_value()) {
+        const auto& v = *sps.vui;
+        out << ",\n          \"vui\": {\n";
+        out << "            \"aspect_ratio_idc\": " << static_cast<int>(v.aspect_ratio_idc) << ",\n";
+        out << "            \"video_full_range_flag\": " << (v.video_full_range_flag ? "true" : "false") << ",\n";
+        out << "            \"colour_primaries\": " << static_cast<int>(v.colour_primaries) << ",\n";
+        out << "            \"transfer_characteristics\": " << static_cast<int>(v.transfer_characteristics) << ",\n";
+        out << "            \"matrix_coefficients\": " << static_cast<int>(v.matrix_coefficients) << ",\n";
+        out << "            \"timing_info_present\": " << (v.vui_timing_info_present_flag ? "true" : "false") << ",\n";
+        out << "            \"num_units_in_tick\": " << v.vui_num_units_in_tick << ",\n";
+        out << "            \"time_scale\": " << v.vui_time_scale << "\n";
+        out << "          }\n";
+    } else {
+        out << "\n";
+    }
     out << "        }\n";
 }
 
@@ -319,6 +350,24 @@ void write_slice_json(std::ostream& out, const bitstream::H264SliceHeaderInfo& s
     out << "        }\n";
 }
 
+void write_sei_json(std::ostream& out, const std::vector<bitstream::SeiMessage>& messages) {
+    out << "        \"sei_messages\": [\n";
+    for (std::size_t i = 0; i < messages.size(); ++i) {
+        out << "          {\"payload_type\": " << messages[i].payload_type
+            << ", \"payload_size\": " << messages[i].payload_size << ", \"name\": ";
+        write_json_string(out, bitstream::sei_payload_type_name(messages[i].payload_type));
+        if (messages[i].user_data_uuid.has_value()) {
+            out << ", \"uuid\": ";
+            write_json_string(out, *messages[i].user_data_uuid);
+        }
+        if (messages[i].recovery_frame_cnt.has_value()) {
+            out << ", \"recovery_frame_cnt\": " << *messages[i].recovery_frame_cnt;
+        }
+        out << "}" << (i + 1 == messages.size() ? "" : ",") << "\n";
+    }
+    out << "        ]\n";
+}
+
 void write_h264_details_json(std::ostream& out, const analysis::H264NalAnalysis& h264) {
     out << "      \"h264\": {\n";
     out << "        \"forbidden_zero_bit\": " << static_cast<int>(h264.header.forbidden_zero_bit) << ",\n";
@@ -351,6 +400,9 @@ void write_h264_details_json(std::ostream& out, const analysis::H264NalAnalysis&
         out << "        \"slice_parse_error\": ";
         write_json_string(out, *h264.slice_parse_error);
         out << "\n";
+    } else if (!h264.sei_messages.empty()) {
+        out << ",\n";
+        write_sei_json(out, h264.sei_messages);
     } else {
         out << "\n";
     }
@@ -399,6 +451,9 @@ void write_h265_details_json(std::ostream& out, const analysis::H265NalAnalysis&
         out << "        \"slice_parse_error\": ";
         write_json_string(out, *h265.slice_parse_error);
         out << "\n";
+    } else if (!h265.sei_messages.empty()) {
+        out << ",\n";
+        write_sei_json(out, h265.sei_messages);
     } else {
         out << "\n";
     }

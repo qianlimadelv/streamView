@@ -10,6 +10,7 @@
 #include "streamview/bitstream/h265_slice.hpp"
 #include "streamview/bitstream/h265_sps.hpp"
 #include "streamview/bitstream/h265_vps.hpp"
+#include "streamview/bitstream/sei.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -59,6 +60,7 @@ struct H264NalAnalysis {
     std::optional<std::string> sps_parse_error;
     std::optional<std::string> pps_parse_error;
     std::optional<std::string> slice_parse_error;
+    std::vector<bitstream::SeiMessage> sei_messages;
 };
 
 struct H265NalAnalysis {
@@ -71,6 +73,7 @@ struct H265NalAnalysis {
     std::optional<std::string> sps_parse_error;
     std::optional<std::string> pps_parse_error;
     std::optional<std::string> slice_parse_error;
+    std::vector<bitstream::SeiMessage> sei_messages;
 };
 
 struct NalAnalysis {

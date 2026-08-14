@@ -23,7 +23,11 @@ if(NOT result EQUAL 0)
 endif()
 
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E compare_files "${STREAMVIEW_OUTPUT}" "${STREAMVIEW_GOLDEN}"
+    COMMAND
+        "${CMAKE_COMMAND}"
+        "-DACTUAL=${STREAMVIEW_OUTPUT}"
+        "-DEXPECTED=${STREAMVIEW_GOLDEN}"
+        -P "${CMAKE_CURRENT_LIST_DIR}/compare_text_files.cmake"
     RESULT_VARIABLE compare_result
 )
 

@@ -23,6 +23,8 @@ struct H265VpsInfo {
     std::uint32_t max_latency_increase_plus1{};
     std::uint32_t max_layer_id{};
     std::uint32_t num_layer_sets_minus1{};
+
+    bool operator==(const H265VpsInfo&) const = default;
 };
 
 struct H265VpsParseResult {

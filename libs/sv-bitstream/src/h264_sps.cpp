@@ -53,20 +53,26 @@ namespace {
            reader.read_bits(5).has_value() && reader.read_bits(5).has_value();
 }
 
-[[nodiscard]] bool skip_vui_parameters(BitReader& reader) {
+[[nodiscard]] bool parse_vui_parameters(BitReader& reader, H264VuiInfo& vui) {
     const auto aspect_ratio_info_present_flag = reader.read_bit();
     if (!aspect_ratio_info_present_flag.has_value()) {
         return false;
     }
+    vui.aspect_ratio_info_present_flag = *aspect_ratio_info_present_flag;
     if (*aspect_ratio_info_present_flag) {
         const auto aspect_ratio_idc = reader.read_bits(8);
         if (!aspect_ratio_idc.has_value()) {
             return false;
         }
+        vui.aspect_ratio_idc = static_cast<std::uint8_t>(*aspect_ratio_idc);
         if (*aspect_ratio_idc == 255) {
-            if (!reader.read_bits(16).has_value() || !reader.read_bits(16).has_value()) {
+            const auto sar_width = reader.read_bits(16);
+            const auto sar_height = reader.read_bits(16);
+            if (!sar_width.has_value() || !sar_height.has_value()) {
                 return false;
             }
+            vui.sar_width = static_cast<std::uint16_t>(*sar_width);
+            vui.sar_height = static_cast<std::uint16_t>(*sar_height);
         }
     }
 
@@ -82,17 +88,31 @@ namespace {
     if (!video_signal_type_present_flag.has_value()) {
         return false;
     }
+    vui.video_signal_type_present_flag = *video_signal_type_present_flag;
     if (*video_signal_type_present_flag) {
-        if (!reader.read_bits(3).has_value() || !reader.read_bit().has_value()) {
+        const auto video_format = reader.read_bits(3);
+        const auto video_full_range_flag = reader.read_bit();
+        if (!video_format.has_value() || !video_full_range_flag.has_value()) {
             return false;
         }
+        vui.video_format = static_cast<std::uint8_t>(*video_format);
+        vui.video_full_range_flag = *video_full_range_flag;
         const auto colour_description_present_flag = reader.read_bit();
         if (!colour_description_present_flag.has_value()) {
             return false;
         }
-        if (*colour_description_present_flag &&
-            (!reader.read_bits(8).has_value() || !reader.read_bits(8).has_value() || !reader.read_bits(8).has_value())) {
-            return false;
+        vui.colour_description_present_flag = *colour_description_present_flag;
+        if (*colour_description_present_flag) {
+            const auto colour_primaries = reader.read_bits(8);
+            const auto transfer_characteristics = reader.read_bits(8);
+            const auto matrix_coefficients = reader.read_bits(8);
+            if (!colour_primaries.has_value() || !transfer_characteristics.has_value() ||
+                !matrix_coefficients.has_value()) {
+                return false;
+            }
+            vui.colour_primaries = static_cast<std::uint8_t>(*colour_primaries);
+            vui.transfer_characteristics = static_cast<std::uint8_t>(*transfer_characteristics);
+            vui.matrix_coefficients = static_cast<std::uint8_t>(*matrix_coefficients);
         }
     }
 
@@ -108,15 +128,25 @@ namespace {
     if (!timing_info_present_flag.has_value()) {
         return false;
     }
-    if (*timing_info_present_flag &&
-        (!reader.read_bits(32).has_value() || !reader.read_bits(32).has_value() || !reader.read_bit().has_value())) {
-        return false;
+    vui.timing_info_present_flag = *timing_info_present_flag;
+    if (*timing_info_present_flag) {
+        const auto num_units_in_tick = reader.read_bits(32);
+        const auto time_scale = reader.read_bits(32);
+        const auto fixed_frame_rate_flag = reader.read_bit();
+        if (!num_units_in_tick.has_value() || !time_scale.has_value() ||
+            !fixed_frame_rate_flag.has_value()) {
+            return false;
+        }
+        vui.num_units_in_tick = static_cast<std::uint32_t>(*num_units_in_tick);
+        vui.time_scale = static_cast<std::uint32_t>(*time_scale);
+        vui.fixed_frame_rate_flag = *fixed_frame_rate_flag;
     }
 
     const auto nal_hrd_parameters_present_flag = reader.read_bit();
     if (!nal_hrd_parameters_present_flag.has_value()) {
         return false;
     }
+    vui.nal_hrd_parameters_present_flag = *nal_hrd_parameters_present_flag;
     if (*nal_hrd_parameters_present_flag && !skip_hrd_parameters(reader)) {
         return false;
     }
@@ -125,6 +155,7 @@ namespace {
     if (!vcl_hrd_parameters_present_flag.has_value()) {
         return false;
     }
+    vui.vcl_hrd_parameters_present_flag = *vcl_hrd_parameters_present_flag;
     if (*vcl_hrd_parameters_present_flag && !skip_hrd_parameters(reader)) {
         return false;
     }
@@ -300,8 +331,12 @@ H264SpsParseResult parse_h264_sps(std::span<const std::uint8_t> nal_payload) {
     if (!vui_parameters_present_flag.has_value()) {
         return {Status::parse_error("failed to read vui_parameters_present_flag"), std::nullopt};
     }
-    if (*vui_parameters_present_flag && !skip_vui_parameters(reader)) {
-        return {Status::parse_error("failed to skip VUI parameters"), std::nullopt};
+    if (*vui_parameters_present_flag) {
+        H264VuiInfo vui{};
+        if (!parse_vui_parameters(reader, vui)) {
+            return {Status::parse_error("failed to parse VUI parameters"), std::nullopt};
+        }
+        info.vui = vui;
     }
 
     const std::uint32_t coded_width = (info.pic_width_in_mbs_minus1 + 1) * 16;

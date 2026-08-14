@@ -158,6 +158,8 @@ StreamAnalysis analyze_h264_annex_b(std::string input_path, std::span<const std:
                 nal.h264->slice_parse_error = "missing active SPS";
                 add_parse_error(analysis.summary, &ParseErrorStats::slice);
             }
+        } else if (nal.h264->header.nal_unit_type == bitstream::H264NalType::Sei) {
+            nal.h264->sei_messages = bitstream::parse_sei_messages(payload, 1);
         }
 
         analysis.nals.push_back(std::move(nal));

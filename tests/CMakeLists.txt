@@ -177,22 +177,24 @@ set_tests_properties(streamview-cli-json-summary-h264-minimal
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
-add_test(
-    NAME streamview-cli-json-summary-mp4-h264
-    COMMAND
-        ${CMAKE_COMMAND}
-        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
-        -DSTREAMVIEW_SAMPLE=tests/samples/mp4/minimal_h264.mp4
-        -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/minimal_h264_mp4_summary.json
-        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/minimal_h264_mp4_summary.actual.json
-        -DSTREAMVIEW_JSON_MODE=summary
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
-)
+if(STREAMVIEW_HAS_FFMPEG_DEMUX)
+    add_test(
+        NAME streamview-cli-json-summary-mp4-h264
+        COMMAND
+            ${CMAKE_COMMAND}
+            -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+            -DSTREAMVIEW_SAMPLE=tests/samples/mp4/minimal_h264.mp4
+            -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/minimal_h264_mp4_summary.json
+            -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/minimal_h264_mp4_summary.actual.json
+            -DSTREAMVIEW_JSON_MODE=summary
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
+    )
 
-set_tests_properties(streamview-cli-json-summary-mp4-h264
-    PROPERTIES
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-)
+    set_tests_properties(streamview-cli-json-summary-mp4-h264
+        PROPERTIES
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+endif()
 
 add_test(
     NAME streamview-cli-limited-json-h264-minimal
@@ -428,39 +430,41 @@ set_tests_properties(streamview-cli-json-summary-h265-minimal
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
-add_test(
-    NAME streamview-cli-json-full-mp4-h264
-    COMMAND
-        ${CMAKE_COMMAND}
-        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
-        -DSTREAMVIEW_SAMPLE=tests/samples/mp4/minimal_h264.mp4
-        -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/minimal_h264_mp4_full.json
-        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/minimal_h264_mp4_full.actual.json
-        -DSTREAMVIEW_JSON_MODE=full
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
-)
+if(STREAMVIEW_HAS_FFMPEG_DEMUX)
+    add_test(
+        NAME streamview-cli-json-full-mp4-h264
+        COMMAND
+            ${CMAKE_COMMAND}
+            -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+            -DSTREAMVIEW_SAMPLE=tests/samples/mp4/minimal_h264.mp4
+            -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/minimal_h264_mp4_full.json
+            -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/minimal_h264_mp4_full.actual.json
+            -DSTREAMVIEW_JSON_MODE=full
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
+    )
 
-set_tests_properties(streamview-cli-json-full-mp4-h264
-    PROPERTIES
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-)
+    set_tests_properties(streamview-cli-json-full-mp4-h264
+        PROPERTIES
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
 
-add_test(
-    NAME streamview-cli-json-summary-mp4-h265
-    COMMAND
-        ${CMAKE_COMMAND}
-        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
-        -DSTREAMVIEW_SAMPLE=tests/samples/mp4/short_h265.mp4
-        -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/short_h265_mp4_summary.json
-        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/short_h265_mp4_summary.actual.json
-        -DSTREAMVIEW_JSON_MODE=summary
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
-)
+    add_test(
+        NAME streamview-cli-json-summary-mp4-h265
+        COMMAND
+            ${CMAKE_COMMAND}
+            -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+            -DSTREAMVIEW_SAMPLE=tests/samples/mp4/short_h265.mp4
+            -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/short_h265_mp4_summary.json
+            -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/short_h265_mp4_summary.actual.json
+            -DSTREAMVIEW_JSON_MODE=summary
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
+    )
 
-set_tests_properties(streamview-cli-json-summary-mp4-h265
-    PROPERTIES
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-)
+    set_tests_properties(streamview-cli-json-summary-mp4-h265
+        PROPERTIES
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+endif()
 
 add_test(
     NAME streamview-cli-summary-h265-minimal
@@ -495,9 +499,6 @@ set_tests_properties(streamview-cli-json-stdout-h265-minimal
 )
 
 set(STREAMVIEW_REAL_MEDIA_DIR "" CACHE PATH "Optional local directory that contains real H.264/H.265 samples for smoke tests")
-if(NOT STREAMVIEW_REAL_MEDIA_DIR AND EXISTS "/home/zhangyp/code/media")
-    set(STREAMVIEW_REAL_MEDIA_DIR "/home/zhangyp/code/media")
-endif()
 
 if(STREAMVIEW_REAL_MEDIA_DIR)
     set(STREAMVIEW_REAL_H264_SAMPLE "${STREAMVIEW_REAL_MEDIA_DIR}/video_264_hd.h264")
@@ -515,17 +516,30 @@ if(STREAMVIEW_REAL_MEDIA_DIR)
                 -DSTREAMVIEW_REQUIRED_JSON_FIELD=active_sps
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_smoke_test.cmake
         )
-        if(STREAMVIEW_REAL_MEDIA_DIR STREQUAL "/home/zhangyp/code/media")
+        add_test(
+            NAME streamview-cli-real-h264-summary-golden
+            COMMAND
+                ${CMAKE_COMMAND}
+                -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+                -DSTREAMVIEW_SAMPLE=${STREAMVIEW_REAL_H264_SAMPLE}
+                -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/real_h264_video_264_hd_summary.json
+                -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/real_h264_summary.actual.json
+                -DSTREAMVIEW_JSON_MODE=summary
+                -DSTREAMVIEW_NORMALIZE_INPUT_PATH=ON
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
+        )
+        # Decode smoke test needs the FFmpeg decode module (real, decodable input).
+        if(STREAMVIEW_HAS_FFMPEG_DEMUX)
             add_test(
-                NAME streamview-cli-real-h264-summary-golden
+                NAME streamview-cli-real-h264-decode
                 COMMAND
                     ${CMAKE_COMMAND}
                     -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
                     -DSTREAMVIEW_SAMPLE=${STREAMVIEW_REAL_H264_SAMPLE}
-                    -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/real_h264_video_264_hd_summary.json
-                    -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/real_h264_summary.actual.json
-                    -DSTREAMVIEW_JSON_MODE=summary
-                    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
+                    -DSTREAMVIEW_THUMB=${CMAKE_CURRENT_BINARY_DIR}/real_h264_frame0.ppm
+                    -DSTREAMVIEW_MV_JSON=${CMAKE_CURRENT_BINARY_DIR}/real_h264_frame0_mv.json
+                    -DSTREAMVIEW_FRAME=0
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_decode_test.cmake
             )
         endif()
     endif()
@@ -545,18 +559,32 @@ if(STREAMVIEW_REAL_MEDIA_DIR)
                 -DSTREAMVIEW_REQUIRED_JSON_FIELD=active_h265_sps
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_smoke_test.cmake
         )
-        if(STREAMVIEW_REAL_MEDIA_DIR STREQUAL "/home/zhangyp/code/media")
-            add_test(
-                NAME streamview-cli-real-h265-summary-golden
-                COMMAND
-                    ${CMAKE_COMMAND}
-                    -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
-                    -DSTREAMVIEW_SAMPLE=${STREAMVIEW_REAL_H265_SAMPLE}
-                    -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/real_h265_video_265_sd_summary.json
-                    -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/real_h265_summary.actual.json
-                    -DSTREAMVIEW_JSON_MODE=summary
-                    -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
-            )
+        add_test(
+            NAME streamview-cli-real-h265-summary-golden
+            COMMAND
+                ${CMAKE_COMMAND}
+                -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+                -DSTREAMVIEW_SAMPLE=${STREAMVIEW_REAL_H265_SAMPLE}
+                -DSTREAMVIEW_GOLDEN=${CMAKE_CURRENT_SOURCE_DIR}/golden/real_h265_video_265_sd_summary.json
+                -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/real_h265_summary.actual.json
+                -DSTREAMVIEW_JSON_MODE=summary
+                -DSTREAMVIEW_NORMALIZE_INPUT_PATH=ON
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_json_mode_golden_test.cmake
+        )
+        # HEVC block-level overlay smoke tests (need libde265).
+        if(LIBDE265_FOUND)
+            foreach(layer qp partition intra)
+                add_test(
+                    NAME streamview-cli-real-h265-block-${layer}
+                    COMMAND
+                        ${CMAKE_COMMAND}
+                        -DSTREAMVIEW_CLI=$<TARGET_FILE:streamview>
+                        -DSTREAMVIEW_SAMPLE=${STREAMVIEW_REAL_H265_SAMPLE}
+                        -DSTREAMVIEW_LAYER=${layer}
+                        -DSTREAMVIEW_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/real_h265_block_${layer}.ppm
+                        -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_block_test.cmake
+                )
+            endforeach()
         endif()
     endif()
 endif()

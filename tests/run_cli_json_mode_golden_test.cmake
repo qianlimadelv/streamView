@@ -31,8 +31,24 @@ if(NOT result EQUAL 0)
     message(FATAL_ERROR "streamview analyze failed: ${stderr}")
 endif()
 
+if(STREAMVIEW_NORMALIZE_INPUT_PATH)
+    get_filename_component(normalized_input "${STREAMVIEW_SAMPLE}" NAME)
+    file(READ "${STREAMVIEW_OUTPUT}" actual_json)
+    string(REGEX REPLACE
+        "(\"input\"[ \\t]*:[ \\t]*\")[^\"]*(\")"
+        "\\1${normalized_input}\\2"
+        normalized_json
+        "${actual_json}"
+    )
+    file(WRITE "${STREAMVIEW_OUTPUT}" "${normalized_json}")
+endif()
+
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E compare_files "${STREAMVIEW_OUTPUT}" "${STREAMVIEW_GOLDEN}"
+    COMMAND
+        "${CMAKE_COMMAND}"
+        "-DACTUAL=${STREAMVIEW_OUTPUT}"
+        "-DEXPECTED=${STREAMVIEW_GOLDEN}"
+        -P "${CMAKE_CURRENT_LIST_DIR}/compare_text_files.cmake"
     RESULT_VARIABLE compare_result
 )
 

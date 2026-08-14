@@ -14,6 +14,8 @@ struct H264PpsInfo {
     bool entropy_coding_mode_flag{};
     bool bottom_field_pic_order_in_frame_present_flag{};
     std::uint32_t num_slice_groups_minus1{};
+
+    bool operator==(const H264PpsInfo&) const = default;
 };
 
 struct H264PpsParseResult {

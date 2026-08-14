@@ -11,3 +11,4 @@ out/
 *.actual.json
 *.log
 cmake-build-*/
+node_modules/
